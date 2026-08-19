@@ -1,0 +1,6 @@
+{
+  "data_file": "Base_de_datos.csv",
+  "separator": ";",
+  "encoding": "utf-8-sig",
+  "target": "Pago_atiempo"
+}
