@@ -1,0 +1,31 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+# Sin fail-under: aún no existe código Python productivo importable.
+# Se añadirá un umbral real cuando Stage 3 cree ft_engineering.py u otro módulo.
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+exclude = [
+    "*.ipynb",
+    "codigoproyecto-venv/",
+    ".atl/",
+    "__pycache__/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    ".coverage*",
+    "coverage.xml",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
