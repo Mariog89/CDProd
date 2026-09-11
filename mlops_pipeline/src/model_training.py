@@ -1,1 +1,4 @@
-"""Entrenamiento y comparación de modelos; selecciona el mejor por desempeño, consistencia y escalabilidad."""
+"""Entrenamiento y comparación de modelos.
+
+Selecciona el mejor modelo según desempeño, consistencia y escalabilidad.
+"""

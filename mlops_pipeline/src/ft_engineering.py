@@ -1,1 +1,4 @@
-"""Ingeniería de características: genera los features y los conjuntos de entrenamiento y evaluación."""
+"""Ingeniería de características.
+
+Genera los features y los conjuntos de datos de entrenamiento y evaluación.
+"""
