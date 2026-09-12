@@ -1,0 +1,31 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["mlops_pipeline/src"]
+omit = ["tests/*"]
+# Sin fail-under todavía: solo existe Cargar_datos.py como código productivo.
+# Se fijará un umbral real cuando Stage 3 añada más módulos.
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+exclude = [
+    "*.ipynb",
+    "codigoproyecto-venv/",
+    ".atl/",
+    "__pycache__/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    ".coverage*",
+    "coverage.xml",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

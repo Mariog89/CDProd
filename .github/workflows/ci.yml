@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  quality:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+
+      - name: Dependency consistency check
+        run: python -m pip check
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Run tests
+        run: pytest -q
+
+      # Cobertura del código productivo real (mlops_pipeline/src).
+      # Bloqueante: si coverage.xml no puede generarse, el CI debe fallar.
+      # Sin fail-under todavía: el umbral se definirá cuando Stage 3 lo decida.
+      - name: Coverage report
+        if: always()
+        run: pytest -q --cov=mlops_pipeline/src --cov-report=term-missing --cov-report=xml:coverage.xml tests/
+
+      - name: SonarCloud scan
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+        # Versión indicada por el onboarding oficial de SonarQube Cloud.
+        uses: SonarSource/sonarqube-scan-action@v8.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
