@@ -38,16 +38,12 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-      # Capacidad de cobertura preparada para Stage 3.
-      # Hoy no hay módulos .py en src, por lo que --cov=src reportaría
-      # "No data was collected" y generaría una métrica vacía/falsa.
-      # Por eso este paso solo informa (always run, continue on error implícito
-      # al no ser bloqueante) y no falla el pipeline. En Stage 3, cuando exista
-      # ft_engineering.py u otro módulo, se volverá bloqueante con fail-under.
-      - name: Coverage report (informational, non-blocking)
+      # Cobertura del código productivo real (mlops_pipeline/src).
+      # Bloqueante: si coverage.xml no puede generarse, el CI debe fallar.
+      # Sin fail-under todavía: el umbral se definirá cuando Stage 3 lo decida.
+      - name: Coverage report
         if: always()
-        continue-on-error: true
-        run: pytest -q --cov=src --cov-report=term-missing --cov-report=xml:coverage.xml tests/
+        run: pytest -q --cov=mlops_pipeline/src --cov-report=term-missing --cov-report=xml:coverage.xml tests/
 
       - name: SonarCloud scan
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'

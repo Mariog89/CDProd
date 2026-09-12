@@ -2,10 +2,10 @@
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["mlops_pipeline/src"]
 omit = ["tests/*"]
-# Sin fail-under: aún no existe código Python productivo importable.
-# Se añadirá un umbral real cuando Stage 3 cree ft_engineering.py u otro módulo.
+# Sin fail-under todavía: solo existe Cargar_datos.py como código productivo.
+# Se fijará un umbral real cuando Stage 3 añada más módulos.
 
 [tool.coverage.report]
 exclude_lines = [
