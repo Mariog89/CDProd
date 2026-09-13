@@ -59,6 +59,10 @@ FEATURES_NUMERICAS = [*COLUMNAS_NUMERICAS_BASE, "ratio_cuota_ingreso"]
 FEATURES_NOMINALES = ["tipo_credito", "tipo_laboral", "tendencia_ingresos_limpia"]
 FEATURES_V1 = [*FEATURES_NUMERICAS, *FEATURES_NOMINALES]
 
+# Nota: "puntaje" (interno, casi constante en el EDA) se excluye de FEATURES_V1.
+# "puntaje_datacredito" (externo, con señal de riesgo) sí pertenece a FEATURES_V1.
+# No confundirlas: son variables distintas con distinto origen y utilidad.
+
 
 def _convertir_numerico(serie: pd.Series) -> pd.Series:
     """Convierte texto a número con coma decimal, tolerando errores como NaN."""
@@ -93,6 +97,10 @@ def crear_features(df: pd.DataFrame) -> pd.DataFrame:
 
     - ratio_cuota_ingreso: cuota/salario si salario > 0, si no NaN (nunca inf).
     - tendencia_ingresos_limpia: dominio válido o "Ausente o inválida", sin NaN.
+
+    La coerción numérica de salario/cuota es defensiva e intencional: aunque
+    normalizar_tipos() ya las convierte, crear_features() debe seguir siendo
+    robusta al reutilizarse en inferencia con inputs heterogéneos.
     """
     df = df.copy()
     salario = pd.to_numeric(df["salario_cliente"], errors="coerce")
