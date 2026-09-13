@@ -15,11 +15,10 @@ Disponible actualmente:
 - Configuración canónica de Stage 3 en `mlops_pipeline/src/config.json`.
 - Setup del entorno en Windows mediante `set_up.bat`.
 - Dependencias directas reproducibles declaradas en `requirements.txt`.
+- `comprension_eda.ipynb`: notebook de comprensión/EDA existente, migrado desde el análisis exploratorio previo, ubicado en `mlops_pipeline/src/comprension_eda.ipynb`.
 - Calidad/CI con pytest, Ruff, GitHub Actions y SonarQube Cloud.
 
 Estructura preparada, pendiente de implementación:
-
-- `comprension_eda.py`
 - `hueristic_model.py`
 - `model_training.py`
 - `model_deploy.py`
@@ -33,7 +32,7 @@ CDProd/
 ├── mlops_pipeline/
 │   └── src/
 │       ├── Cargar_datos.py
-│       ├── comprension_eda.py
+│       ├── comprension_eda.ipynb
 │       ├── ft_engineering.py
 │       ├── hueristic_model.py
 │       ├── model_training.py
