@@ -1,5 +1,8 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "data_regression: pruebas de regresión/integración que dependen del contenido concreto de Base_de_datos.csv",
+]
 
 [tool.coverage.run]
 source = ["mlops_pipeline/src"]

@@ -263,6 +263,7 @@ def test_target_no_binario_error():
         separar_xy(df)
 
 
+@pytest.mark.data_regression
 def test_real_shapes_y_eventos():
     datos = preparar_datos(_real_crudo())
     assert datos.X_train.shape == (8610, 16)
@@ -276,6 +277,7 @@ def test_real_shapes_y_eventos():
     assert abs(datos.metadata["tasa_riesgo_eval"] - 0.0475) < 0.01
 
 
+@pytest.mark.data_regression
 def test_real_sin_infinitos():
     datos = preparar_datos(_real_crudo())
     prep = crear_preprocesador()

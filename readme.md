@@ -9,36 +9,53 @@ Analizar la información disponible sobre créditos y clientes con el fin de ide
 Disponible actualmente:
 
 - `Base_de_datos.csv` en la raíz del repositorio.
-- Análisis exploratorio de datos (EDA) en `src/desarrollo/transformacion_eda.ipynb`.
-- Configuración de lectura y variable objetivo en `src/config.json`.
+- Pipeline de Stage 3 en `mlops_pipeline/src/`.
+- `Cargar_datos.py`: carga reproducible de configuración y datos crudos.
+- `ft_engineering.py`: feature engineering reproducible sin leakage (16 features v1, split 80/20 estratificado).
+- Configuración canónica de Stage 3 en `mlops_pipeline/src/config.json`.
 - Setup del entorno en Windows mediante `set_up.bat`.
 - Dependencias directas reproducibles declaradas en `requirements.txt`.
+- Calidad/CI con pytest, Ruff, GitHub Actions y SonarQube Cloud.
 
-Todavía NO está implementado (próximos pasos del Entregable 3, no funcionalidades existentes):
+Estructura preparada, pendiente de implementación:
 
-- `ft_engineering.py`
-- Heuristic / baseline model
-- Model training
-- Model deployment
-- Model evaluation
-- Model monitoring
+- `comprension_eda.py`
+- `hueristic_model.py`
+- `model_training.py`
+- `model_deploy.py`
+- `model_evaluation.py`
+- `model_monitoring.py`
 
 ## Estructura del proyecto
 
 ```text
 CDProd/
+├── mlops_pipeline/
+│   └── src/
+│       ├── Cargar_datos.py
+│       ├── comprension_eda.py
+│       ├── ft_engineering.py
+│       ├── hueristic_model.py
+│       ├── model_training.py
+│       ├── model_deploy.py
+│       ├── model_evaluation.py
+│       ├── model_monitoring.py
+│       └── config.json
+├── tests/
+├── .github/
 ├── Base_de_datos.csv
 ├── requirements.txt
-├── set_up.bat
-├── readme.md
+├── requirements-dev.txt
+├── pyproject.toml
+├── sonar-project.properties
 ├── .gitignore
-└── src/
-    ├── config.json
-    └── desarrollo/
-        └── transformacion_eda.ipynb
+├── readme.md
+└── set_up.bat
 ```
 
 El entorno virtual local `codigoproyecto-venv` no forma parte del repositorio: está ignorado por Git y se genera localmente con `set_up.bat`.
+
+El análisis exploratorio histórico que originó el diseño actual se conserva únicamente en el historial Git; ya no forma parte de la estructura activa.
 
 ## Requisitos del entorno
 
@@ -62,25 +79,20 @@ cd CDProd
 - Instala las dependencias desde `requirements.txt`.
 - Registra el kernel de Jupyter como "Python CDProd".
 
-## Ejecución del notebook
+## Ejecución de pruebas y calidad
 
-Ruta correcta del análisis actual:
-
-```text
-src/desarrollo/transformacion_eda.ipynb
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -m pytest -q
+.\codigoproyecto-venv\Scripts\python.exe -m ruff check .
+.\codigoproyecto-venv\Scripts\python.exe -m ruff format --check .
+.\codigoproyecto-venv\Scripts\python.exe -m pip check
 ```
 
 Para reproducir el entorno validado del proyecto, seleccione el kernel `Python CDProd`.
 
-Ejemplo:
-
-```bash
-jupyter notebook src/desarrollo/transformacion_eda.ipynb
-```
-
 ## Configuración
 
-`src/config.json` contiene la configuración actual de lectura de datos y variable objetivo:
+`mlops_pipeline/src/config.json` contiene la configuración actual de lectura de datos y variable objetivo:
 
 - `data_file`: nombre del archivo de datos en la raíz del proyecto.
 - `separator`: separador de columnas del CSV.
@@ -95,7 +107,7 @@ El archivo `Base_de_datos.csv` contiene registros históricos de créditos con i
 - Historial crediticio y puntajes.
 - Saldos, cuotas y cumplimiento de pagos.
 
-El archivo se encuentra en la raíz del repositorio, que es la ubicación esperada por el notebook a través de `src/config.json`.
+El archivo se encuentra en la raíz del repositorio, que es la ubicación esperada por `Cargar_datos.py` a través de `mlops_pipeline/src/config.json`.
 
 ## Workflow Git
 
@@ -107,14 +119,11 @@ El archivo se encuentra en la raíz del repositorio, que es la ubicación espera
 
 El Entregable 3 continuará con:
 
-- Feature engineering reproducible.
 - Modelo heurístico / baseline.
 - Entrenamiento y comparación de modelos.
 - Deployment.
 - Evaluation.
 - Monitoring.
-
-Ninguno de estos componentes está implementado todavía.
 
 ## Licencia
 

@@ -39,6 +39,7 @@ def test_data_file_se_resuelve():
     assert ruta.name == config["data_file"]
 
 
+@pytest.mark.data_regression
 def test_cargar_datos_devuelve_dataframe_esperado():
     raiz, config = _raiz_y_config()
     df = cargar_datos(resolver_ruta_datos(raiz, config), config)
