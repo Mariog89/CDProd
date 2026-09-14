@@ -7,8 +7,9 @@ markers = [
 [tool.coverage.run]
 source = ["mlops_pipeline/src"]
 omit = ["tests/*"]
-# Sin fail-under todavía: solo existe Cargar_datos.py como código productivo.
-# Se fijará un umbral real cuando Stage 3 añada más módulos.
+# Sin fail-under todavía: el umbral se definirá cuando Stage 3 lo decida.
+# Cobertura actual sobre mlops_pipeline/src con varios módulos productivos
+# (Cargar_datos, ft_engineering, hueristic_model, model_training).
 
 [tool.coverage.report]
 exclude_lines = [

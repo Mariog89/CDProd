@@ -12,6 +12,8 @@ Disponible actualmente:
 - Pipeline de Stage 3 en `mlops_pipeline/src/`.
 - `Cargar_datos.py`: carga reproducible de configuración y datos crudos.
 - `ft_engineering.py`: feature engineering reproducible sin leakage (16 features v1, split 80/20 estratificado).
+- `hueristic_model.py`: baseline heurístico de negocio fijo y explicable (reglas R1/R2/R3 congeladas).
+- `model_training.py`: comparación CV-safe de familias ML, selección, tuning y fit final sobre train.
 - Configuración canónica de Stage 3 en `mlops_pipeline/src/config.json`.
 - Setup del entorno en Windows mediante `set_up.bat`.
 - Dependencias directas reproducibles declaradas en `requirements.txt`.
@@ -19,8 +21,6 @@ Disponible actualmente:
 - Calidad/CI con pytest, Ruff, GitHub Actions y SonarQube Cloud.
 
 Estructura preparada, pendiente de implementación:
-- `hueristic_model.py`
-- `model_training.py`
 - `model_deploy.py`
 - `model_evaluation.py`
 - `model_monitoring.py`
@@ -118,11 +118,11 @@ El archivo se encuentra en la raíz del repositorio, que es la ubicación espera
 
 El Entregable 3 continuará con:
 
-- Modelo heurístico / baseline.
-- Entrenamiento y comparación de modelos.
-- Deployment.
-- Evaluation.
-- Monitoring.
+- Evaluation (`model_evaluation.py`).
+- Deployment (`model_deploy.py`).
+- Monitoring (`model_monitoring.py`).
+
+Ya implementados: `Cargar_datos.py`, `comprension_eda.ipynb`, `ft_engineering.py`, `hueristic_model.py` y `model_training.py`.
 
 ## Licencia
 
