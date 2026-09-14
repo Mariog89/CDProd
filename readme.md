@@ -118,11 +118,11 @@ El archivo se encuentra en la raíz del repositorio, que es la ubicación espera
 
 El Entregable 3 continuará con:
 
-- Modelo heurístico / baseline.
-- Entrenamiento y comparación de modelos.
-- Deployment.
-- Evaluation.
-- Monitoring.
+- Evaluation (`model_evaluation.py`).
+- Deployment (`model_deploy.py`).
+- Monitoring (`model_monitoring.py`).
+
+Ya implementados: `Cargar_datos.py`, `comprension_eda.ipynb`, `ft_engineering.py`, `hueristic_model.py` y `model_training.py`.
 
 ## Licencia
 
