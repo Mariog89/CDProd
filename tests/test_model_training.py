@@ -1,6 +1,10 @@
 """Pruebas del protocolo experimental CV-safe de model_training."""
 
 import inspect
+import subprocess
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -221,3 +225,115 @@ def test_hgb_search_usa_random_state():
     X, y = _xy(n=150)
     search = mt.ajustar_hiperparametros("hist_gradient_boosting", prep, X, y, mt.crear_folds(X, y))
     assert search.random_state == 42
+
+
+def _resultado_entrenamiento_sintetico():
+    comparativa = {
+        "heuristic": _resultado("heuristic", 0.11, 0.01, 0.60, fit=0.02),
+        "logistic_regression": _resultado("logistic_regression", 0.134, 0.009, 0.58, fit=0.06),
+        "random_forest": _resultado("random_forest", 0.04, 0.02, 0.03, fit=0.5),
+        "hist_gradient_boosting": _resultado("hist_gradient_boosting", 0.14, 0.012, 0.16, fit=1.0),
+    }
+    dummy = _resultado("dummy", 0.05, 0.005, 0.10, fit=0.02)
+    final = _resultado("final_tuned", 0.132, 0.008, 0.589, fit=0.07)
+    return mt.ResultadoEntrenamiento(
+        comparativa_cv_familias=comparativa,
+        resultado_dummy=dummy,
+        resultado_cv_modelo_final=final,
+        modelo_final_fitted=object(),
+        nombre_modelo_final="logistic_regression",
+        hiperparametros_finales={"model__C": 0.1},
+        justificacion_seleccion="Elegido: logistic_regression (sintético).",
+    )
+
+
+def test_import_no_ejecuta_main():
+    raiz = Path(mt.__file__).resolve().parents[2]
+    proc = subprocess.run(
+        [sys.executable, "-c", "import mlops_pipeline.src.model_training as m; print('import-ok')"],
+        cwd=raiz,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0
+    assert "import-ok" in proc.stdout
+    assert "=== Comparación CV de modelos ===" not in proc.stdout
+    fuente = inspect.getsource(mt)
+    assert 'if __name__ == "__main__":' in fuente
+
+
+def test_ejecucion_directa_resuelve_imports_absolutos():
+    fuente = inspect.getsource(mt)
+    assert 'if __package__ in {None, ""}:' in fuente
+    assert "repo_root = Path(__file__).resolve().parents[2]" in fuente
+    assert "sys.path.insert(0, str(repo_root))" in fuente
+    assert "from mlops_pipeline.src.Cargar_datos import" in fuente
+    assert "from mlops_pipeline.src.ft_engineering import" in fuente
+    assert "from mlops_pipeline.src.hueristic_model import" in fuente
+    assert "except ImportError" not in fuente
+    assert "from ft_engineering import" not in fuente
+    assert "from Cargar_datos import" not in fuente
+    assert "from hueristic_model import" not in fuente
+
+
+def test_bootstrap_no_duplica_repo_root():
+    fuente = inspect.getsource(mt)
+    assert "if str(repo_root) not in sys.path:" in fuente
+    repo_root = str(Path(mt.__file__).resolve().parents[2])
+    simulado: list = []
+    for _ in range(2):
+        if repo_root not in simulado:
+            simulado.insert(0, repo_root)
+    assert simulado.count(repo_root) == 1
+    assert sys.path.count(repo_root) <= 1
+
+
+def test_imprimir_resultados_con_sintetico(capsys):
+    resultado = _resultado_entrenamiento_sintetico()
+    mt._imprimir_resultados(resultado)
+    salida = capsys.readouterr().out
+    assert "=== Comparación CV de modelos ===" in salida
+    assert "Heuristic" in salida
+    assert "LogisticRegression" in salida
+    assert "RandomForest" in salida
+    assert "HistGradientBoosting" in salida
+    assert "=== Baseline técnico ===" in salida
+    assert "Dummy" in salida
+    assert "=== Selección ===" in salida
+    assert "logistic_regression" in salida
+    assert "=== Hiperparámetros ===" in salida
+    assert "model__C" in salida
+    assert "=== CV configuración final ===" in salida
+    assert (
+        "Todas las métricas anteriores se calcularon exclusivamente sobre X_train/y_train."
+        in salida
+    )
+    assert "X_eval/y_eval permanecen sellados para model_evaluation.py." in salida
+
+
+def test_main_usa_solo_train_y_preprocessor(monkeypatch, capsys):
+    assert list(inspect.signature(mt.main).parameters) == []
+    fuente_main = inspect.getsource(mt.main)
+    assert "X_eval" not in fuente_main
+    assert "y_eval" not in fuente_main
+    x_train, y_train, preprocessor = object(), object(), object()
+    datos_fake = SimpleNamespace(X_train=x_train, y_train=y_train, preprocessor=preprocessor)
+    monkeypatch.setattr(mt, "encontrar_raiz_proyecto", lambda: Path("/tmp"))
+    monkeypatch.setattr(mt, "cargar_config", lambda _ruta: {})
+    monkeypatch.setattr(mt, "resolver_ruta_datos", lambda _raiz, _cfg: Path("/tmp/d.csv"))
+    monkeypatch.setattr(mt, "cargar_datos", lambda _ruta, _cfg: object())
+    monkeypatch.setattr(mt, "preparar_datos", lambda _df: datos_fake)
+    llamadas: dict = {}
+
+    def falso_entrenar(x, y, prep):
+        llamadas["args"] = (x, y, prep)
+        return _resultado_entrenamiento_sintetico()
+
+    monkeypatch.setattr(mt, "entrenar", falso_entrenar)
+    mt.main()
+    assert llamadas["args"][0] is x_train
+    assert llamadas["args"][1] is y_train
+    assert llamadas["args"][2] is preprocessor
+    salida = capsys.readouterr().out
+    assert "=== Selección ===" in salida

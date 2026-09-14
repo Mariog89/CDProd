@@ -7,8 +7,10 @@ y encoding solo con su train fold. El holdout X_eval/y_eval jamás se usa.
 Métrica primaria: F1 de la clase de riesgo (Pago_atiempo = 0).
 """
 
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -34,12 +36,24 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.utils.validation import check_is_fitted
 
-from mlops_pipeline.src.ft_engineering import (
+if __package__ in {None, ""}:
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+from mlops_pipeline.src.Cargar_datos import (  # noqa: E402
+    cargar_config,
+    cargar_datos,
+    encontrar_raiz_proyecto,
+    resolver_ruta_datos,
+)
+from mlops_pipeline.src.ft_engineering import (  # noqa: E402
     FEATURES_NOMINALES,
     FEATURES_NUMERICAS,
     RISK_LABEL,
+    preparar_datos,
 )
-from mlops_pipeline.src.hueristic_model import HeuristicModel
+from mlops_pipeline.src.hueristic_model import HeuristicModel  # noqa: E402
 
 RANDOM_STATE = 42
 N_SPLITS = 5
@@ -402,3 +416,62 @@ def entrenar(
         random_state=RANDOM_STATE,
         n_splits=N_SPLITS,
     )
+
+
+def _imprimir_resultados(resultado: ResultadoEntrenamiento) -> None:
+    """Muestra el protocolo CV ejecutado exclusivamente sobre X_train/y_train."""
+    nombres = {
+        "heuristic": "Heuristic",
+        "logistic_regression": "LogisticRegression",
+        "random_forest": "RandomForest",
+        "hist_gradient_boosting": "HistGradientBoosting",
+    }
+    print("=== Comparación CV de modelos ===")
+    for clave in ("heuristic", "logistic_regression", "random_forest", "hist_gradient_boosting"):
+        r = resultado.comparativa_cv_familias[clave]
+        print(
+            f"{nombres[clave]}: "
+            f"F1_0={r.mean_f1_0:.4f}±{r.std_f1_0:.4f}, "
+            f"Recall_0={r.mean_recall_0:.4f}, "
+            f"Precision_0={r.mean_precision_0:.4f}, "
+            f"BalancedAccuracy={r.mean_balanced_accuracy:.4f}, "
+            f"fit={r.mean_cv_fit_time:.2f}s"
+        )
+    print("=== Baseline técnico ===")
+    dummy = resultado.resultado_dummy
+    print(
+        f"Dummy: F1_0={dummy.mean_f1_0:.4f}±{dummy.std_f1_0:.4f}, "
+        f"Recall_0={dummy.mean_recall_0:.4f}, "
+        f"Precision_0={dummy.mean_precision_0:.4f}, "
+        f"BalancedAccuracy={dummy.mean_balanced_accuracy:.4f}, "
+        f"fit={dummy.mean_cv_fit_time:.2f}s"
+    )
+    print("=== Selección ===")
+    print(f"Modelo seleccionado: {resultado.nombre_modelo_final}")
+    print(resultado.justificacion_seleccion)
+    print("=== Hiperparámetros ===")
+    print(resultado.hiperparametros_finales)
+    print("=== CV configuración final ===")
+    final = resultado.resultado_cv_modelo_final
+    print(f"F1_0={final.mean_f1_0:.4f}±{final.std_f1_0:.4f}")
+    print(f"Recall_0={final.mean_recall_0:.4f}±{final.std_recall_0:.4f}")
+    print(f"Precision_0={final.mean_precision_0:.4f}")
+    print(f"BalancedAccuracy={final.mean_balanced_accuracy:.4f}")
+    print(f"CV fit time={final.mean_cv_fit_time:.2f}s")
+    print(f"CV score time={final.mean_cv_score_time:.2f}s")
+    print("Todas las métricas anteriores se calcularon exclusivamente sobre X_train/y_train.")
+    print("X_eval/y_eval permanecen sellados para model_evaluation.py.")
+
+
+def main() -> None:
+    """Ejecuta el protocolo completo solo con X_train/y_train y lo imprime."""
+    raiz = encontrar_raiz_proyecto()
+    config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
+    df = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    datos = preparar_datos(df)
+    resultado = entrenar(datos.X_train, datos.y_train, datos.preprocessor)
+    _imprimir_resultados(resultado)
+
+
+if __name__ == "__main__":
+    main()
