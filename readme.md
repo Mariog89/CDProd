@@ -16,14 +16,14 @@ Disponible actualmente:
 - `model_training.py`: comparación CV-safe de familias ML, selección, tuning y fit final sobre train.
 - `model_evaluation.py`: evaluación final sobre holdout sellado (métricas de riesgo, matriz, CV-vs-holdout, inferencia y estadística exploratoria).
 - `model_deploy.py`: persistencia versionada del Pipeline final, carga validada con SHA-256 e inferencia reutilizable sin target.
+- `model_monitoring.py`: monitoreo batch por ventana (calidad cruda, feature drift con PSI, prediction drift y performance solo con labels, sin retraining).
 - Configuración canónica de Stage 3 en `mlops_pipeline/src/config.json`.
 - Setup del entorno en Windows mediante `set_up.bat`.
 - Dependencias directas reproducibles declaradas en `requirements.txt`.
 - `comprension_eda.ipynb`: notebook de comprensión/EDA existente, migrado desde el análisis exploratorio previo, ubicado en `mlops_pipeline/src/comprension_eda.ipynb`.
 - Calidad/CI con pytest, Ruff, GitHub Actions y SonarQube Cloud.
 
-Estructura preparada, pendiente de implementación:
-- `model_monitoring.py`
+Stage 3 implementado con 8 archivos: `Cargar_datos.py`, `ft_engineering.py`, `hueristic_model.py`, `model_training.py`, `model_evaluation.py`, `model_deploy.py`, `model_monitoring.py` y `config.json`.
 
 ## Estructura del proyecto
 
@@ -116,11 +116,9 @@ El archivo se encuentra en la raíz del repositorio, que es la ubicación espera
 
 ## Próximos pasos
 
-El Entregable 3 continuará con:
+Stage 3 completado: monitoreo batch descriptivo implementado en `model_monitoring.py` (baseline solo train, PSI congelado, sin retraining ni servicios externos).
 
-- Monitoring (`model_monitoring.py`).
-
-Ya implementados: `Cargar_datos.py`, `comprension_eda.ipynb`, `ft_engineering.py`, `hueristic_model.py`, `model_training.py`, `model_evaluation.py` y `model_deploy.py`.
+Ya implementados: `Cargar_datos.py`, `comprension_eda.ipynb`, `ft_engineering.py`, `hueristic_model.py`, `model_training.py`, `model_evaluation.py`, `model_deploy.py` y `model_monitoring.py`.
 
 ## Licencia
 
