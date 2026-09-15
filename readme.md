@@ -14,6 +14,7 @@ Disponible actualmente:
 - `ft_engineering.py`: feature engineering reproducible sin leakage (16 features v1, split 80/20 estratificado).
 - `hueristic_model.py`: baseline heurístico de negocio fijo y explicable (reglas R1/R2/R3 congeladas).
 - `model_training.py`: comparación CV-safe de familias ML, selección, tuning y fit final sobre train.
+- `model_evaluation.py`: evaluación final sobre holdout sellado (métricas de riesgo, matriz, CV-vs-holdout, inferencia y estadística exploratoria).
 - Configuración canónica de Stage 3 en `mlops_pipeline/src/config.json`.
 - Setup del entorno en Windows mediante `set_up.bat`.
 - Dependencias directas reproducibles declaradas en `requirements.txt`.
@@ -22,7 +23,6 @@ Disponible actualmente:
 
 Estructura preparada, pendiente de implementación:
 - `model_deploy.py`
-- `model_evaluation.py`
 - `model_monitoring.py`
 
 ## Estructura del proyecto
@@ -118,11 +118,10 @@ El archivo se encuentra en la raíz del repositorio, que es la ubicación espera
 
 El Entregable 3 continuará con:
 
-- Evaluation (`model_evaluation.py`).
 - Deployment (`model_deploy.py`).
 - Monitoring (`model_monitoring.py`).
 
-Ya implementados: `Cargar_datos.py`, `comprension_eda.ipynb`, `ft_engineering.py`, `hueristic_model.py` y `model_training.py`.
+Ya implementados: `Cargar_datos.py`, `comprension_eda.ipynb`, `ft_engineering.py`, `hueristic_model.py`, `model_training.py` y `model_evaluation.py`.
 
 ## Licencia
 
