@@ -59,6 +59,8 @@ FEATURES_NUMERICAS = [*COLUMNAS_NUMERICAS_BASE, "ratio_cuota_ingreso"]
 FEATURES_NOMINALES = ["tipo_credito", "tipo_laboral", "tendencia_ingresos_limpia"]
 FEATURES_V1 = [*FEATURES_NUMERICAS, *FEATURES_NOMINALES]
 
+FEATURE_SCHEMA_VERSION = "1"
+
 # Nota: "puntaje" (interno, casi constante en el EDA) se excluye de FEATURES_V1.
 # "puntaje_datacredito" (externo, con señal de riesgo) sí pertenece a FEATURES_V1.
 # No confundirlas: son variables distintas con distinto origen y utilidad.
@@ -113,6 +115,29 @@ def crear_features(df: pd.DataFrame) -> pd.DataFrame:
         .where(df["tendencia_ingresos"].isin(TENDENCIAS_VALIDAS), TENDENCIA_AUSENTE)
     )
     return df
+
+
+def preparar_features_inferencia(df_crudo: pd.DataFrame) -> pd.DataFrame:
+    """Prepara features de serving sin target, en orden exacto FEATURES_V1.
+
+    Único camino de serving hacia el Pipeline: normalizar_tipos ->
+    crear_features -> validar FEATURES_V1 -> devolver FEATURES_V1 en orden.
+
+    Contrato: no exige Pago_atiempo (se ignora si viene), ignora columnas
+    extra, no hace split/fit/transform aprendido, no imputa fuera del
+    pipeline y no modifica el input.
+    """
+    if not isinstance(df_crudo, pd.DataFrame):
+        raise TypeError("df_crudo debe ser un pd.DataFrame.")
+    df_norm = normalizar_tipos(df_crudo)
+    try:
+        df_feat = crear_features(df_norm)
+    except KeyError as exc:
+        raise KeyError(f"Falta columna cruda requerida para inferencia: {exc}") from exc
+    faltantes = [c for c in FEATURES_V1 if c not in df_feat.columns]
+    if faltantes:
+        raise KeyError(f"Faltan features v1 para inferencia: {faltantes}")
+    return df_feat[FEATURES_V1].copy()
 
 
 def separar_xy(df: pd.DataFrame, target: str = "Pago_atiempo") -> tuple[pd.DataFrame, pd.Series]:
