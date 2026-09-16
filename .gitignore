@@ -22,3 +22,6 @@ Thumbs.db
 # Temporales
 *.tmp
 *.log
+
+# Artefactos de modelo (no versionar)
+artifacts/
