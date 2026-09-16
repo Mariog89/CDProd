@@ -186,15 +186,13 @@ def predict_batch(payload: BatchRequest, request: Request):
     try:
         df_crudo = pd.DataFrame(payload.records)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422, detail=f"records invalidos: {_sanitizar_detalle(exc)}"
-        ) from exc
+        _LOG.warning("invalid request records: %s", type(exc).__name__)
+        raise HTTPException(status_code=422, detail="records invalidos") from exc
     try:
         resultado = predecir(artifact, df_crudo)
     except (ValueError, KeyError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422, detail=f"schema invalido: {_sanitizar_detalle(exc)}"
-        ) from exc
+        _LOG.warning("invalid prediction schema: %s", type(exc).__name__)
+        raise HTTPException(status_code=422, detail="schema invalido") from exc
     except Exception as exc:  # noqa: BLE001 - 500 generico sin stack trace
         raise HTTPException(status_code=500, detail="prediction failed") from exc
     try:

@@ -210,7 +210,7 @@ def test_14_schema_invalido_error_claro(monkeypatch):
     app_module.app.state.artifact = _artefacto()
     resp = cliente.post("/predict_batch", json={"records": [_registro()]})
     assert resp.status_code == 422
-    assert "capital_prestado" in resp.json()["detail"]
+    assert resp.json()["detail"] == "schema invalido"
 
 
 def test_15_modelo_no_disponible_503():
@@ -472,3 +472,40 @@ def test_30_log_append_valido_y_monitor_compatible(monkeypatch, tmp_path):
     crudas = {c[4:]: [f[c] for f in filas] for c in filas[0] if c.startswith("raw_")}
     equis = preparar_features_inferencia(pd.DataFrame(crudas))
     assert list(equis.columns) == list(FEATURES_V1)
+
+
+def test_31_xss_schema_invalido_no_refleja(monkeypatch):
+    carga = "<script>alert(1)</script>"
+
+    def _romper(artefacto, df):
+        raise ValueError(f"columna maliciosa {carga} en C:\\srv\\app")
+
+    monkeypatch.setattr(app_module, "predecir", _romper)
+    cliente = TestClient(app_module.app, raise_server_exceptions=False)
+    app_module.app.state.artifact = _artefacto()
+    registro = _registro()
+    registro["tipo_credito"] = carga
+    resp = cliente.post("/predict_batch", json={"records": [registro]})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "schema invalido"
+    assert carga not in resp.text
+    assert "C:\\srv" not in resp.text
+    assert "<script>" not in resp.text
+
+
+def test_32_xss_records_invalidos_no_refleja(monkeypatch):
+    carga = "<script>alert(1)</script>"
+
+    def _romper(_datos):
+        raise ValueError(f"frame roto {carga}")
+
+    monkeypatch.setattr(pd, "DataFrame", _romper)
+    try:
+        cliente = TestClient(app_module.app, raise_server_exceptions=False)
+        app_module.app.state.artifact = _artefacto()
+        resp = cliente.post("/predict_batch", json={"records": [_registro()]})
+    finally:
+        monkeypatch.undo()
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "records invalidos"
+    assert carga not in resp.text
