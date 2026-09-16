@@ -15,7 +15,7 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from mlops_pipeline.src.ft_engineering import RAW_FEATURES_V1
@@ -166,7 +166,7 @@ def health(request: Request):
     )
 
 
-@app.get("/metrics", response_class=HTMLResponse)
+@app.get("/metrics")
 def metrics():
     """Sirve la pestaña de métricas si fue generada; nunca recalcula."""
     ruta = resolver_metrics_path()
@@ -175,7 +175,10 @@ def metrics():
             status_code=404,
             content={"detail": "metrics not generated yet"},
         )
-    return HTMLResponse(content=ruta.read_text(encoding="utf-8"))
+    return FileResponse(
+        path=ruta,
+        media_type="text/html",
+    )
 
 
 @app.post("/predict_batch")

@@ -344,6 +344,7 @@ def test_24_metrics_sirve_html_si_existe(monkeypatch, tmp_path):
     cliente = TestClient(app_module.app, raise_server_exceptions=False)
     resp = cliente.get("/metrics")
     assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/html")
     assert "F1_0 0.1429" in resp.text
 
 
