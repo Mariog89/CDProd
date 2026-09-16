@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Analizar la información disponible sobre créditos y clientes con el fin de identificar problemas de calidad de datos, caracterizar el comportamiento de la cartera y encontrar factores asociados con el cumplimiento o incumplimiento oportuno de los pagos, como base para la futura construcción de un modelo predictivo.
+Analizar la información disponible sobre créditos y clientes con el fin de identificar problemas de calidad de datos, caracterizar el comportamiento de la cartera y encontrar factores asociados con el cumplimiento o incumplimiento oportuno de los pagos; construir y evaluar un modelo de riesgo crediticio y exponerlo mediante un endpoint batch con monitoreo de deriva.
 
 ## Estado actual
 
@@ -21,7 +21,7 @@ Disponible actualmente:
 - Setup del entorno en Windows mediante `set_up.bat`.
 - Dependencias directas reproducibles declaradas en `requirements.txt`.
 - `comprension_eda.ipynb`: notebook de comprensión/EDA existente, migrado desde el análisis exploratorio previo, ubicado en `mlops_pipeline/src/comprension_eda.ipynb`.
-- Calidad/CI con pytest, Ruff, GitHub Actions y SonarQube Cloud.
+- Calidad/CI con pytest, Ruff, GitHub Actions y SonarQube Cloud (cobertura y análisis sobre `mlops_pipeline/src`, `app.py` y `scripts`).
 
 Stage 3 implementado con 8 archivos: `Cargar_datos.py`, `ft_engineering.py`, `hueristic_model.py`, `model_training.py`, `model_evaluation.py`, `model_deploy.py`, `model_monitoring.py` y `config.json`.
 
@@ -40,8 +40,13 @@ CDProd/
 │       ├── model_evaluation.py
 │       ├── model_monitoring.py
 │       └── config.json
+├── scripts/
+│   └── export_model_artifact.py
 ├── tests/
 ├── .github/
+├── app.py
+├── Dockerfile
+├── .dockerignore
 ├── Base_de_datos.csv
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -51,6 +56,8 @@ CDProd/
 ├── readme.md
 └── set_up.bat
 ```
+
+`artifacts/` y `runtime/` son directorios generados localmente e ignorados por Git: no forman parte de los archivos versionados.
 
 El entorno virtual local `codigoproyecto-venv` no forma parte del repositorio: está ignorado por Git y se genera localmente con `set_up.bat`.
 
@@ -139,7 +146,7 @@ Variable opcional: `MODEL_ARTIFACT_DIR` (default `artifacts/1.0.0`).
 Respuesta conceptual:
 
 ```json
-{"model_version": "1.0.0", "count": 2, "predictions": [{"prediction": 1, "risk_probability": 0.4499, "risk_score": null, "prediction_timestamp": "2026-09-16T02:21:20Z"}]}
+{"model_version": "1.0.0", "count": 1, "predictions": [{"prediction": 1, "risk_probability": 0.4499, "risk_score": null, "prediction_timestamp": "2026-09-16T02:21:20Z"}]}
 ```
 
 5. Build Docker:
@@ -180,7 +187,7 @@ Servida por la API sin reevaluar: `GET /metrics` (ruta configurable con `METRICS
 
 ## Monitoring operativo
 
-- Cada `POST /predict_batch` agrega al log append-only `runtime/prediction_log.csv` (configurable con `PREDICTION_LOG_PATH`): `request_id` común al batch, timestamp, versión, predicción, probabilidades e inputs raw con prefijo `raw_`. Nunca guarda `Pago_atiempo`.
+- Cada `POST /predict_batch` agrega al log append-only `runtime/prediction_log.csv` (configurable con `PREDICTION_LOG_PATH`): `request_id` común al batch, timestamp, versión, predicción, probabilidades e inputs raw con prefijo `raw_`. El esquema es fijo (`RAW_FEATURES_V1`: los 15 campos raw necesarios para reconstruir FEATURES_V1); columnas extra del request —incluido `Pago_atiempo` o datos personales arbitrarios— se aceptan en inferencia pero nunca se persisten. Nunca guarda `Pago_atiempo`.
 - `model_monitoring.cargar_tabla_predicciones(ruta)` lee ese log validando columnas mínimas.
 - `model_monitoring.muestrear_batch(df, n, random_state=42)` muestrea de forma reproducible sin modificar el input.
 - `model_monitoring.monitorizar_desde_log(perfil, ruta_log, n_sample=...)` encadena carga → muestreo → `monitorizar(...)` y registra `n_total/n_sampled`. Baseline train, bins PSI y thresholds intactos.

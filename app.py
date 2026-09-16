@@ -15,9 +15,10 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from mlops_pipeline.src.ft_engineering import RAW_FEATURES_V1
 from mlops_pipeline.src.model_deploy import cargar_modelo, predecir
 
 _LOG = logging.getLogger(__name__)
@@ -61,13 +62,15 @@ def registrar_log_batch(
 ) -> str:
     """Agrega un batch al prediction log append-only para monitoring.
 
-    No guarda Pago_atiempo, secretos ni rutas internas. Solo inputs raw
-    (prefijo raw_) más la salida de inferencia, con request_id común.
+    Esquema fijo: columnas base + un raw_<campo> por cada RAW_FEATURES_V1,
+    en orden fijo, independiente de las claves de cada request.
+    Para cada registro: presente → valor; ausente → vacío; columnas extra
+    (incluido Pago_atiempo o PII arbitraria) → nunca se guardan.
+    La inferencia sigue aceptando columnas extra; solo el logger las descarta.
     """
     destino = Path(ruta) if ruta is not None else resolver_log_path()
     request_id = uuid.uuid4().hex
     destino.parent.mkdir(parents=True, exist_ok=True)
-    claves_raw = sorted({k for r in registros for k in r if k != "Pago_atiempo"})
     columnas = [
         "request_id",
         "prediction_timestamp",
@@ -75,7 +78,7 @@ def registrar_log_batch(
         "prediction",
         "risk_probability",
         "risk_score",
-        *[f"raw_{k}" for k in claves_raw],
+        *[f"raw_{k}" for k in RAW_FEATURES_V1],
     ]
     existe = destino.is_file()
     with open(destino, "a", encoding="utf-8", newline="") as archivo:
@@ -91,7 +94,7 @@ def registrar_log_batch(
                 "risk_probability": pred.get("risk_probability"),
                 "risk_score": pred.get("risk_score"),
             }
-            for clave in claves_raw:
+            for clave in RAW_FEATURES_V1:
                 valor = registro.get(clave)
                 fila[f"raw_{clave}"] = "" if valor is None else str(valor)
             escritor.writerow(fila)
@@ -163,7 +166,7 @@ def health(request: Request):
     )
 
 
-@app.get("/metrics", response_class=HTMLResponse)
+@app.get("/metrics")
 def metrics():
     """Sirve la pestaña de métricas si fue generada; nunca recalcula."""
     ruta = resolver_metrics_path()
@@ -172,7 +175,10 @@ def metrics():
             status_code=404,
             content={"detail": "metrics not generated yet"},
         )
-    return HTMLResponse(content=ruta.read_text(encoding="utf-8"))
+    return FileResponse(
+        path=ruta,
+        media_type="text/html",
+    )
 
 
 @app.post("/predict_batch")
@@ -183,15 +189,13 @@ def predict_batch(payload: BatchRequest, request: Request):
     try:
         df_crudo = pd.DataFrame(payload.records)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422, detail=f"records invalidos: {_sanitizar_detalle(exc)}"
-        ) from exc
+        _LOG.warning("invalid request records: %s", type(exc).__name__)
+        raise HTTPException(status_code=422, detail="records invalidos") from exc
     try:
         resultado = predecir(artifact, df_crudo)
     except (ValueError, KeyError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422, detail=f"schema invalido: {_sanitizar_detalle(exc)}"
-        ) from exc
+        _LOG.warning("invalid prediction schema: %s", type(exc).__name__)
+        raise HTTPException(status_code=422, detail="schema invalido") from exc
     except Exception as exc:  # noqa: BLE001 - 500 generico sin stack trace
         raise HTTPException(status_code=500, detail="prediction failed") from exc
     try:
