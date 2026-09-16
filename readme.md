@@ -108,6 +108,56 @@ El archivo `Base_de_datos.csv` contiene registros históricos de créditos con i
 
 El archivo se encuentra en la raíz del repositorio, que es la ubicación esperada por `Cargar_datos.py` a través de `mlops_pipeline/src/config.json`.
 
+## Endpoint de predicción batch
+
+La API batch reutiliza `model_deploy.cargar_modelo()` y `model_deploy.predecir()` sin reentrenar ni recargar el modelo por request. Clase `0` = riesgo, `1` = pago oportuno. El input no requiere `Pago_atiempo`; si llega como columna extra se ignora.
+
+1. Generar el artefacto operativo (solo train, sin holdout):
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe scripts/export_model_artifact.py --output artifacts/1.0.0
+```
+
+Genera `artifacts/1.0.0/model.joblib` + `metadata.json` (`model_version: 1.0.0`). `artifacts/` está ignorado por Git y se monta como volumen, no se hornea en la imagen.
+
+2. Iniciar la API local:
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+Variable opcional: `MODEL_ARTIFACT_DIR` (default `artifacts/1.0.0`).
+
+3. Documentación interactiva: `http://127.0.0.1:8000/docs`. Salud: `GET /health` responde `{"status":"ok","model_loaded":true,"model_version":"1.0.0"}`.
+
+4. Ejemplo `POST /predict_batch`:
+
+```json
+{"records": [{"tipo_credito": "4", "capital_prestado": "1852560", "plazo_meses": "12", "edad_cliente": "32", "tipo_laboral": "Empleado", "salario_cliente": "3500000", "total_otros_prestamos": "1000000", "cuota_pactada": "128650", "puntaje_datacredito": "795.0", "cant_creditosvigentes": "0", "creditos_sectorFinanciero": "0", "creditos_sectorCooperativo": "0", "creditos_sectorReal": "0", "promedio_ingresos_datacredito": "916148", "tendencia_ingresos": "Creciente"}]}
+```
+
+Respuesta conceptual:
+
+```json
+{"model_version": "1.0.0", "count": 2, "predictions": [{"prediction": 1, "risk_probability": 0.4499, "risk_score": null, "prediction_timestamp": "2026-09-16T02:21:20Z"}]}
+```
+
+5. Build Docker:
+
+```powershell
+docker build -t cdprod-api .
+```
+
+6. Run Docker (el artefacto se monta, usar placeholder para la ruta local):
+
+```powershell
+docker run --rm `
+  -p 8000:8000 `
+  -v "<RUTA_ABSOLUTA_ARTIFACTS>:/app/artifacts" `
+  -e MODEL_ARTIFACT_DIR=/app/artifacts/1.0.0 `
+  cdprod-api
+```
+
 ## Workflow Git
 
 - `main` representa la rama estable.

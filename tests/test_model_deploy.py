@@ -670,6 +670,17 @@ def test_50_clases_por_named_steps():
 def test_48_main_orquestacion_con_mocks(monkeypatch, tmp_path, capsys):
     from types import SimpleNamespace
 
+    # Aisla el test del filesystem real: "artifacts" se resuelve en tmp.
+    monkeypatch.chdir(tmp_path)
+    # Regresion: simula el artifact persistente de FastAPI sin tocar el real.
+    simulado = tmp_path / "artifacts" / "1.0.0"
+    simulado.mkdir(parents=True)
+    (simulado / "CENTINELA").write_text("x", encoding="utf-8")
+    antes = {(p.name, p.stat().st_size) for p in simulado.iterdir()}
+    raiz_real = Path(__file__).resolve().parents[1]
+    meta_real = raiz_real / "artifacts" / "1.0.0" / "metadata.json"
+    sha_antes = meta_real.read_text(encoding="utf-8") if meta_real.is_file() else None
+
     df_completo = _crudo(n=12, con_target=True)
     x_train = preparar_features_inferencia(df_completo.head(8))
     y_train = pd.Series([0, 1] * 4)
@@ -744,8 +755,14 @@ def test_48_main_orquestacion_con_mocks(monkeypatch, tmp_path, capsys):
     assert vistos.get("overwrite") is False
     assert "=== Deployment demo ===" in out
     assert "Pago_atiempo" not in out or "model_version" in out
-    # No deja artifacts persistentes fuera del temp.
-    assert not Path("artifacts").exists() or list(Path("artifacts").glob("*")) == []
+    # main() no deja artefactos propios persistentes (verificado en tmp
+    # aislado, no en el directorio global). El simulado sigue intacto.
+    assert (simulado / "CENTINELA").is_file()
+    assert {(p.name, p.stat().st_size) for p in simulado.iterdir()} == antes
+    assert sorted(p.name for p in (tmp_path / "artifacts").iterdir()) == ["1.0.0"]
+    # El artifact real de FastAPI no se altera (presente o ausente).
+    sha_despues = meta_real.read_text(encoding="utf-8") if meta_real.is_file() else None
+    assert sha_despues == sha_antes
     fuente = inspect.getsource(md.main)
     assert "TemporaryDirectory" in fuente
     assert "y_eval" not in fuente
