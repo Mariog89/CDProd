@@ -140,6 +140,8 @@ class ResultadoMonitoring:
     alertas: list = field(default_factory=list)
     holdout_reference: dict | None = None
     batch_size_warning: bool = False
+    n_total: int | None = None
+    n_sampled: int | None = None
 
 
 def _utc_now_iso() -> str:
@@ -1429,6 +1431,98 @@ def plot_performance(resultado):
     fig.autofmt_xdate(rotation=20)
     fig.tight_layout()
     return fig
+
+
+# Política operativa: el monitoreo batch se ejecuta semanalmente mediante
+# cron, Windows Task Scheduler o scheduler externo con:
+# python -m mlops_pipeline.src.model_monitoring
+# No hay scheduler embebido en este módulo.
+MONITORING_PERIOD = "weekly"
+
+COLUMNAS_MINIMAS_LOG = (
+    "request_id",
+    "prediction_timestamp",
+    "model_version",
+    "prediction",
+    "risk_probability",
+)
+
+
+def cargar_tabla_predicciones(ruta) -> pd.DataFrame:
+    """Lee el prediction log de FastAPI y valida columnas mínimas."""
+    origen = Path(ruta)
+    if not origen.is_file():
+        raise FileNotFoundError(f"No existe el prediction log: {origen}.")
+    tabla = pd.read_csv(origen, dtype="string")
+    faltantes = [c for c in COLUMNAS_MINIMAS_LOG if c not in tabla.columns]
+    if faltantes:
+        raise ValueError(f"Columnas faltantes en {origen}: {sorted(faltantes)}.")
+    return tabla
+
+
+def muestrear_batch(df: pd.DataFrame, n, random_state: int = 42) -> pd.DataFrame:
+    """Muestra reproducible sin modificar el input.
+
+    Si n >= len(df), devuelve una copia completa.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pd.DataFrame.")
+    total = int(len(df))
+    if n is None or int(n) >= total:
+        return df.copy(deep=True)
+    if int(n) <= 0:
+        raise ValueError("n debe ser positivo.")
+    return df.sample(n=int(n), random_state=random_state).copy(deep=True)
+
+
+def monitorizar_desde_log(
+    perfil,
+    ruta_log,
+    n_sample=None,
+    y_true=None,
+    random_state: int = 42,
+    **kwargs,
+):
+    """Monitorea desde el log real con muestreo opcional.
+
+    Flujo: prediction_log.csv -> cargar_tabla_predicciones ->
+    muestrear_batch opcional -> reconstruir raw batch ->
+    ResultadoPrediccion -> monitorizar(...). No cambia baseline,
+    bins PSI, thresholds, alertas ni lógica de performance.
+    """
+    from types import SimpleNamespace
+
+    tabla = cargar_tabla_predicciones(ruta_log)
+    n_total = int(len(tabla))
+    if n_sample is not None:
+        tabla = muestrear_batch(tabla, n_sample, random_state=random_state)
+    n_sampled = int(len(tabla))
+    crudas = {}
+    for columna in tabla.columns:
+        if columna.startswith("raw_"):
+            crudas[columna[4:]] = tabla[columna].tolist()
+    df_crudo = pd.DataFrame(crudas, index=tabla.index)
+    version = str(tabla["model_version"].iloc[0]) if n_sampled else ""
+    marca = str(tabla["prediction_timestamp"].iloc[0]) if n_sampled else ""
+    marco = pd.DataFrame(
+        {
+            "prediction": pd.to_numeric(tabla["prediction"], errors="coerce"),
+            "risk_probability": pd.to_numeric(tabla["risk_probability"], errors="coerce"),
+            "risk_score": pd.to_numeric(tabla["risk_score"], errors="coerce")
+            if "risk_score" in tabla.columns
+            else np.nan,
+            "model_version": [version] * n_sampled,
+            "prediction_timestamp": [marca] * n_sampled,
+        },
+        index=tabla.index,
+    )
+    resultado_pred = SimpleNamespace(
+        dataframe=marco, model_version=version, prediction_timestamp=marca
+    )
+    resultado = monitorizar(perfil, df_crudo, resultado_pred, y_true=y_true, **kwargs)
+    resultado.n_total = n_total
+    resultado.n_sampled = n_sampled
+    return resultado
 
 
 def main() -> None:

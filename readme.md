@@ -158,6 +158,38 @@ docker run --rm `
   cdprod-api
 ```
 
+## Training literal (PDF)
+
+`model_training.py` expone los wrappers exigidos sin duplicar lógica:
+
+- `summarize_classification(...)` delega en `evaluar_cv`.
+- `build_model(...)` reutiliza `crear_modelos_candidatos`.
+- `tabla_resumen_modelos(comparativa)` presenta por modelo `mean_f1_0/std_f1_0/mean_recall_0/mean_precision_0/mean_balanced_accuracy/mean_cv_fit_time` más las columnas semánticas `Performance` (F1_0/recall_0), `Consistency` (std_f1_0) y `Scalability` (fit time), sin scores ponderados.
+- `plot_comparacion_modelos(comparativa)` grafica F1_0 medio ± std para heuristic, logistic_regression, random_forest y hist_gradient_boosting.
+- `main()` imprime además `=== Tabla resumen Performance / Consistency / Scalability ===`. Resultados y selección intactos.
+
+## Pestaña de métricas
+
+`model_evaluation.generar_pestana_metricas(resultado, ruta)` genera `runtime/metrics.html` (ignorada por Git) solo con datos existentes del `ResultadoEvaluacionCompleta`: modelo, best params, precision/recall/F1/balanced/accuracy, matriz, CV vs holdout, ROC-AUC/AP, ANOVA/Tukey/Friedman, advertencias e imágenes de `plot_*`. No recalcula nada.
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -c "from mlops_pipeline.src.Cargar_datos import cargar_config,cargar_datos,encontrar_raiz_proyecto,resolver_ruta_datos; from mlops_pipeline.src.ft_engineering import preparar_datos; from mlops_pipeline.src.model_training import entrenar; from mlops_pipeline.src.model_evaluation import evaluar,generar_pestana_metricas; r=encontrar_raiz_proyecto(); c=cargar_config(r/'mlops_pipeline/src/config.json'); d=preparar_datos(cargar_datos(resolver_ruta_datos(r,c),c)); print(generar_pestana_metricas(evaluar(entrenar(d.X_train,d.y_train,d.preprocessor),d.X_eval,d.y_eval)))"
+```
+
+Servida por la API sin reevaluar: `GET /metrics` (ruta configurable con `METRICS_HTML_PATH`, default `runtime/metrics.html`; 404 claro si aún no se generó).
+
+## Monitoring operativo
+
+- Cada `POST /predict_batch` agrega al log append-only `runtime/prediction_log.csv` (configurable con `PREDICTION_LOG_PATH`): `request_id` común al batch, timestamp, versión, predicción, probabilidades e inputs raw con prefijo `raw_`. Nunca guarda `Pago_atiempo`.
+- `model_monitoring.cargar_tabla_predicciones(ruta)` lee ese log validando columnas mínimas.
+- `model_monitoring.muestrear_batch(df, n, random_state=42)` muestrea de forma reproducible sin modificar el input.
+- `model_monitoring.monitorizar_desde_log(perfil, ruta_log, n_sample=...)` encadena carga → muestreo → `monitorizar(...)` y registra `n_total/n_sampled`. Baseline train, bins PSI y thresholds intactos.
+- Periodicidad: `MONITORING_PERIOD = "weekly"`. Sin scheduler embebido; ejecutar semanalmente con cron, Windows Task Scheduler o scheduler externo:
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -m mlops_pipeline.src.model_monitoring
+```
+
 ## Workflow Git
 
 - `main` representa la rama estable.
