@@ -619,9 +619,19 @@ def test_plots_devuelven_figura_sin_guardar():
         ),
     ):
         assert isinstance(fig, matplotlib.figure.Figure)
+    for nombre in (
+        "plot_matriz_confusion",
+        "plot_comparacion_holdout",
+        "plot_cv_modelos",
+        "plot_precision_recall",
+    ):
+        fuente_fn = inspect.getsource(getattr(ev, nombre))
+        assert "plt.show()" not in fuente_fn
+        assert "savefig" not in fuente_fn
     fuente = inspect.getsource(ev)
     assert "plt.show()" not in fuente
-    assert "savefig" not in fuente
+    # La pestana serializa figuras solo a buffer en memoria, nunca a disco.
+    assert "BytesIO" in inspect.getsource(ev.generar_pestana_metricas)
 
 
 def test_no_fit_no_search_en_fuente():

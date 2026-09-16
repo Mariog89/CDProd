@@ -25,3 +25,6 @@ Thumbs.db
 
 # Artefactos de modelo (no versionar)
 artifacts/
+
+# Salidas operativas locales (no versionar)
+runtime/

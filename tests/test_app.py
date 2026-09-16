@@ -1,13 +1,23 @@
 """Pruebas del endpoint batch y del export operativo (sin training real)."""
 
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
 import app as app_module
+
+
+@pytest.fixture(autouse=True)
+def _rutas_temporales(monkeypatch, tmp_path):
+    """Ningún test escribe el runtime real del repo."""
+    monkeypatch.setenv("PREDICTION_LOG_PATH", str(tmp_path / "prediction_log.csv"))
+    monkeypatch.setenv("METRICS_HTML_PATH", str(tmp_path / "metrics.html"))
+    yield
 
 
 def _registro(semilla=1, con_target=False):
@@ -326,3 +336,58 @@ def test_23_dockerfile_minimo():
     assert "artifacts" not in texto or "artifacts" in Path(".dockerignore").read_text(
         encoding="utf-8"
     )
+
+
+def test_24_metrics_sirve_html_si_existe(monkeypatch, tmp_path):
+    destino = Path(os.environ["METRICS_HTML_PATH"])
+    destino.write_text("<html><body>F1_0 0.1429</body></html>", encoding="utf-8")
+    cliente = TestClient(app_module.app, raise_server_exceptions=False)
+    resp = cliente.get("/metrics")
+    assert resp.status_code == 200
+    assert "F1_0 0.1429" in resp.text
+
+
+def test_25_metrics_error_claro_si_falta():
+    cliente = TestClient(app_module.app, raise_server_exceptions=False)
+    resp = cliente.get("/metrics")
+    assert resp.status_code == 404
+    assert "detail" in resp.json()
+
+
+def test_26_predict_crea_log_append(monkeypatch):
+    import csv
+
+    cliente, _ = _cliente_listo(monkeypatch)
+    assert cliente.post("/predict_batch", json={"records": [_registro()]}).status_code == 200
+    assert (
+        cliente.post(
+            "/predict_batch", json={"records": [_registro(), _registro(con_target=True)]}
+        ).status_code
+        == 200
+    )
+    ruta = Path(os.environ["PREDICTION_LOG_PATH"])
+    assert ruta.is_file()
+    with open(ruta, encoding="utf-8", newline="") as archivo:
+        filas = list(csv.DictReader(archivo))
+    assert len(filas) == 3
+    assert len({f["request_id"] for f in filas}) == 2
+    assert "Pago_atiempo" not in filas[0] and "raw_tipo_credito" in filas[0]
+    assert filas[0]["model_version"] == "1.0.0"
+    assert filas[0]["prediction"] in ("0", "1")
+
+
+def test_27_log_no_bloquea_respuesta(monkeypatch, tmp_path):
+    monkeypatch.setenv("PREDICTION_LOG_PATH", str(tmp_path))
+    cliente, _ = _cliente_listo(monkeypatch)
+    resp = cliente.post("/predict_batch", json={"records": [_registro()]})
+    assert resp.status_code == 200
+    assert resp.json()["count"] == 1
+
+
+def test_28_log_no_llama_training():
+    import inspect as _inspect
+
+    fuente = _inspect.getsource(app_module.registrar_log_batch)
+    assert ".fit(" not in fuente
+    assert "entrenar(" not in fuente
+    assert "evaluar(" not in fuente
