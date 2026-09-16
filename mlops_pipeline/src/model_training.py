@@ -326,6 +326,116 @@ def seleccionar_modelo(comparativa: dict) -> tuple[str, str]:
     return elegido, "\n".join(lineas)
 
 
+def summarize_classification(
+    nombre: str,
+    estimator,
+    X: pd.DataFrame,
+    y: pd.Series,
+    folds: list | None = None,
+) -> dict:
+    """Wrapper literal: resume el CV de un clasificador sin duplicar lógica.
+
+    Delega en evaluar_cv y devuelve las métricas ya calculadas en un dict
+    estructurado. No entrena un modelo final ni toca el holdout.
+    """
+    folds = folds if folds is not None else crear_folds(X, y)
+    resultado = evaluar_cv(nombre, estimator, X, y, folds)
+    return {
+        "nombre": resultado.nombre,
+        "mean_precision_0": resultado.mean_precision_0,
+        "std_precision_0": resultado.std_precision_0,
+        "mean_recall_0": resultado.mean_recall_0,
+        "std_recall_0": resultado.std_recall_0,
+        "mean_f1_0": resultado.mean_f1_0,
+        "std_f1_0": resultado.std_f1_0,
+        "mean_balanced_accuracy": resultado.mean_balanced_accuracy,
+        "std_balanced_accuracy": resultado.std_balanced_accuracy,
+        "mean_cv_fit_time": resultado.mean_cv_fit_time,
+        "metricas_por_fold": dict(resultado.metricas_por_fold),
+    }
+
+
+def build_model(nombre: str, preprocessor: ColumnTransformer):
+    """Wrapper literal: construye el pipeline base de una familia ML.
+
+    Reutiliza crear_modelos_candidatos; no crea una segunda arquitectura.
+    """
+    candidatos = crear_modelos_candidatos(preprocessor)
+    if nombre not in candidatos:
+        raise ValueError(f"Familia desconocida: {nombre}. Opciones: {sorted(candidatos)}.")
+    return candidatos[nombre]
+
+
+ORDEN_MODELOS_PRINCIPALES = (
+    "heuristic",
+    "logistic_regression",
+    "random_forest",
+    "hist_gradient_boosting",
+)
+
+
+def tabla_resumen_modelos(comparativa: dict) -> pd.DataFrame:
+    """Tabla resumen con criterios Performance/Consistency/Scalability.
+
+    Solo presenta los criterios ya usados por seleccionar_modelo, sin
+    score ponderado ni pesos inventados:
+
+    - Performance: F1_0 / recall_0 (descriptivo).
+    - Consistency: std_f1_0 entre folds.
+    - Scalability: mean_cv_fit_time.
+    """
+    filas = []
+    for nombre in ORDEN_MODELOS_PRINCIPALES:
+        if nombre not in comparativa:
+            continue
+        r = comparativa[nombre]
+        filas.append(
+            {
+                "modelo": nombre,
+                "mean_f1_0": float(r.mean_f1_0),
+                "std_f1_0": float(r.std_f1_0),
+                "mean_recall_0": float(r.mean_recall_0),
+                "mean_precision_0": float(r.mean_precision_0),
+                "mean_balanced_accuracy": float(r.mean_balanced_accuracy),
+                "mean_cv_fit_time": float(r.mean_cv_fit_time),
+                "Performance": (f"F1_0={r.mean_f1_0:.4f} / recall_0={r.mean_recall_0:.4f}"),
+                "Consistency": float(r.std_f1_0),
+                "Scalability": float(r.mean_cv_fit_time),
+            }
+        )
+    return pd.DataFrame(
+        filas,
+        columns=[
+            "modelo",
+            "mean_f1_0",
+            "std_f1_0",
+            "mean_recall_0",
+            "mean_precision_0",
+            "mean_balanced_accuracy",
+            "mean_cv_fit_time",
+            "Performance",
+            "Consistency",
+            "Scalability",
+        ],
+    )
+
+
+def plot_comparacion_modelos(comparativa: dict):
+    """Barras de F1_0 medio por modelo principal con std como error bar."""
+    import matplotlib.pyplot as plt
+
+    nombres = [m for m in ORDEN_MODELOS_PRINCIPALES if m in comparativa]
+    medias = [float(comparativa[m].mean_f1_0) for m in nombres]
+    desvs = [float(comparativa[m].std_f1_0) for m in nombres]
+    fig, ax = plt.subplots()
+    ax.bar(nombres, medias, yerr=desvs, capsize=4)
+    ax.set_ylabel("F1_0 medio")
+    ax.set_title("F1_0 CV por modelo principal (5 folds)")
+    fig.autofmt_xdate(rotation=20)
+    fig.tight_layout()
+    return fig
+
+
 def _contar_combinaciones(espacio: dict) -> int:
     total = 1
     for valores in espacio.values():
@@ -461,6 +571,8 @@ def _imprimir_resultados(resultado: ResultadoEntrenamiento) -> None:
     print(f"CV score time={final.mean_cv_score_time:.2f}s")
     print("Todas las métricas anteriores se calcularon exclusivamente sobre X_train/y_train.")
     print("X_eval/y_eval permanecen sellados para model_evaluation.py.")
+    print("=== Tabla resumen Performance / Consistency / Scalability ===")
+    print(tabla_resumen_modelos(resultado.comparativa_cv_familias).to_string(index=False))
 
 
 def main() -> None:

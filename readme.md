@@ -108,6 +108,88 @@ El archivo `Base_de_datos.csv` contiene registros históricos de créditos con i
 
 El archivo se encuentra en la raíz del repositorio, que es la ubicación esperada por `Cargar_datos.py` a través de `mlops_pipeline/src/config.json`.
 
+## Endpoint de predicción batch
+
+La API batch reutiliza `model_deploy.cargar_modelo()` y `model_deploy.predecir()` sin reentrenar ni recargar el modelo por request. Clase `0` = riesgo, `1` = pago oportuno. El input no requiere `Pago_atiempo`; si llega como columna extra se ignora.
+
+1. Generar el artefacto operativo (solo train, sin holdout):
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe scripts/export_model_artifact.py --output artifacts/1.0.0
+```
+
+Genera `artifacts/1.0.0/model.joblib` + `metadata.json` (`model_version: 1.0.0`). `artifacts/` está ignorado por Git y se monta como volumen, no se hornea en la imagen.
+
+2. Iniciar la API local:
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+Variable opcional: `MODEL_ARTIFACT_DIR` (default `artifacts/1.0.0`).
+
+3. Documentación interactiva: `http://127.0.0.1:8000/docs`. Salud: `GET /health` responde `{"status":"ok","model_loaded":true,"model_version":"1.0.0"}`.
+
+4. Ejemplo `POST /predict_batch`:
+
+```json
+{"records": [{"tipo_credito": "4", "capital_prestado": "1852560", "plazo_meses": "12", "edad_cliente": "32", "tipo_laboral": "Empleado", "salario_cliente": "3500000", "total_otros_prestamos": "1000000", "cuota_pactada": "128650", "puntaje_datacredito": "795.0", "cant_creditosvigentes": "0", "creditos_sectorFinanciero": "0", "creditos_sectorCooperativo": "0", "creditos_sectorReal": "0", "promedio_ingresos_datacredito": "916148", "tendencia_ingresos": "Creciente"}]}
+```
+
+Respuesta conceptual:
+
+```json
+{"model_version": "1.0.0", "count": 2, "predictions": [{"prediction": 1, "risk_probability": 0.4499, "risk_score": null, "prediction_timestamp": "2026-09-16T02:21:20Z"}]}
+```
+
+5. Build Docker:
+
+```powershell
+docker build -t cdprod-api .
+```
+
+6. Run Docker (el artefacto se monta, usar placeholder para la ruta local):
+
+```powershell
+docker run --rm `
+  -p 8000:8000 `
+  -v "<RUTA_ABSOLUTA_ARTIFACTS>:/app/artifacts" `
+  -e MODEL_ARTIFACT_DIR=/app/artifacts/1.0.0 `
+  cdprod-api
+```
+
+## Training literal (PDF)
+
+`model_training.py` expone los wrappers exigidos sin duplicar lógica:
+
+- `summarize_classification(...)` delega en `evaluar_cv`.
+- `build_model(...)` reutiliza `crear_modelos_candidatos`.
+- `tabla_resumen_modelos(comparativa)` presenta por modelo `mean_f1_0/std_f1_0/mean_recall_0/mean_precision_0/mean_balanced_accuracy/mean_cv_fit_time` más las columnas semánticas `Performance` (F1_0/recall_0), `Consistency` (std_f1_0) y `Scalability` (fit time), sin scores ponderados.
+- `plot_comparacion_modelos(comparativa)` grafica F1_0 medio ± std para heuristic, logistic_regression, random_forest y hist_gradient_boosting.
+- `main()` imprime además `=== Tabla resumen Performance / Consistency / Scalability ===`. Resultados y selección intactos.
+
+## Pestaña de métricas
+
+`model_evaluation.generar_pestana_metricas(resultado, ruta)` genera `runtime/metrics.html` (ignorada por Git) solo con datos existentes del `ResultadoEvaluacionCompleta`: modelo, best params, precision/recall/F1/balanced/accuracy, matriz, CV vs holdout, ROC-AUC/AP, ANOVA/Tukey/Friedman, advertencias e imágenes de `plot_*`. No recalcula nada.
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -c "from mlops_pipeline.src.Cargar_datos import cargar_config,cargar_datos,encontrar_raiz_proyecto,resolver_ruta_datos; from mlops_pipeline.src.ft_engineering import preparar_datos; from mlops_pipeline.src.model_training import entrenar; from mlops_pipeline.src.model_evaluation import evaluar,generar_pestana_metricas; r=encontrar_raiz_proyecto(); c=cargar_config(r/'mlops_pipeline/src/config.json'); d=preparar_datos(cargar_datos(resolver_ruta_datos(r,c),c)); print(generar_pestana_metricas(evaluar(entrenar(d.X_train,d.y_train,d.preprocessor),d.X_eval,d.y_eval)))"
+```
+
+Servida por la API sin reevaluar: `GET /metrics` (ruta configurable con `METRICS_HTML_PATH`, default `runtime/metrics.html`; 404 claro si aún no se generó).
+
+## Monitoring operativo
+
+- Cada `POST /predict_batch` agrega al log append-only `runtime/prediction_log.csv` (configurable con `PREDICTION_LOG_PATH`): `request_id` común al batch, timestamp, versión, predicción, probabilidades e inputs raw con prefijo `raw_`. Nunca guarda `Pago_atiempo`.
+- `model_monitoring.cargar_tabla_predicciones(ruta)` lee ese log validando columnas mínimas.
+- `model_monitoring.muestrear_batch(df, n, random_state=42)` muestrea de forma reproducible sin modificar el input.
+- `model_monitoring.monitorizar_desde_log(perfil, ruta_log, n_sample=...)` encadena carga → muestreo → `monitorizar(...)` y registra `n_total/n_sampled`. Baseline train, bins PSI y thresholds intactos.
+- Periodicidad: `MONITORING_PERIOD = "weekly"`. Sin scheduler embebido; ejecutar semanalmente con cron, Windows Task Scheduler o scheduler externo:
+
+```bat
+.\codigoproyecto-venv\Scripts\python.exe -m mlops_pipeline.src.model_monitoring
+```
+
 ## Workflow Git
 
 - `main` representa la rama estable.

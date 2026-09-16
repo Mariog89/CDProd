@@ -10,6 +10,7 @@ No reentrena, no tunea, no cambia thresholds, no selecciona otro modelo
 y no modifica features. El holdout es de uso único por protocolo.
 """
 
+import html
 import sys
 import time
 from dataclasses import dataclass, field
@@ -585,6 +586,173 @@ def _imprimir_tukey(est: ResultadoEstadistico) -> None:
                 f"IC95%=[{bajo:.4f}, {alto:.4f}] "
                 f"significativo={significativo}"
             )
+
+
+def generar_pestana_metricas(
+    resultado: ResultadoEvaluacionCompleta,
+    ruta_salida=None,
+    titulo: str = "CDProd — Pestaña de métricas",
+) -> Path:
+    """Genera la pestaña de métricas como HTML estático.
+
+    Usa exclusivamente los datos ya calculados en resultado; no recalcula
+    métricas ni reejecuta evaluación. Las imágenes provienen de las
+    funciones plot_* existentes.
+    """
+    import base64
+    import io
+
+    import matplotlib
+
+    try:
+        matplotlib.use("Agg")
+    except Exception:
+        pass
+
+    raiz = encontrar_raiz_proyecto()
+    destino = Path(ruta_salida) if ruta_salida is not None else (raiz / "runtime" / "metrics.html")
+    if not destino.is_absolute():
+        destino = raiz / destino
+    ml = resultado.holdout_modelo_final
+    heu = resultado.holdout_heuristico
+    comp = resultado.comparacion_cv_final_vs_holdout
+    est = resultado.analisis_estadistico_familias
+    tim = resultado.inference_timing
+    prob = ml.probabilisticas
+
+    def _f(num, nd=4):
+        return "n/a" if num is None else f"{float(num):.{nd}f}"
+
+    imagenes = []
+    for nombre_fig, fig in (
+        ("Matriz de confusión", plot_matriz_confusion(ml)),
+        ("CV final vs Holdout", plot_comparacion_holdout(comp)),
+    ):
+        try:
+            buffer = io.BytesIO()
+            fig.savefig(buffer, format="png")
+            imagenes.append((nombre_fig, base64.b64encode(buffer.getvalue()).decode("ascii")))
+        except Exception:
+            imagenes.append((nombre_fig, None))
+        finally:
+            try:
+                import matplotlib.pyplot as plt
+
+                plt.close(fig)
+            except Exception:
+                pass
+
+    filas_tukey = ""
+    if est.tukey is not None:
+        try:
+            modelos = list(est.modelos)
+            estadistico = np.asarray(est.tukey.statistic, dtype=float)
+            pvalores = np.asarray(est.tukey.pvalue, dtype=float)
+            intervalo = est.tukey.confidence_interval(confidence_level=0.95)
+            bajos = np.asarray(intervalo.low, dtype=float)
+            altos = np.asarray(intervalo.high, dtype=float)
+            for i in range(len(modelos)):
+                for j in range(i + 1, len(modelos)):
+                    p = float(pvalores[i, j])
+                    sig = "sí" if p < 0.05 else "no"
+                    filas_tukey += (
+                        f"<tr><td>{html.escape(modelos[i])} vs "
+                        f"{html.escape(modelos[j])}</td>"
+                        f"<td>{float(estadistico[i, j]):.4f}</td>"
+                        f"<td>{p:.4g}</td>"
+                        f"<td>[{float(bajos[i, j]):.4f}, "
+                        f"{float(altos[i, j]):.4f}]</td>"
+                        f"<td>{sig}</td></tr>"
+                    )
+        except Exception:
+            filas_tukey = ""
+    if filas_tukey == "":
+        filas_tukey = "<tr><td colspan='5'>Tukey no disponible</td></tr>"
+
+    if prob.roc_auc_risk is not None:
+        prob_html = (
+            f"<p>ROC-AUC riesgo: {_f(prob.roc_auc_risk)}<br>"
+            f"Average Precision riesgo: {_f(prob.average_precision_risk)}</p>"
+        )
+    else:
+        prob_html = f"<p>Probabilísticas no disponibles: {html.escape(str(prob.motivo))}</p>"
+    advertencias = "".join(
+        f"<li>{html.escape(str(a))}</li>" for a in resultado.advertencias_metodologicas
+    )
+    imagenes_html = "".join(
+        f"<h3>{html.escape(n)}</h3><img src='data:image/png;base64,{b}' alt='{html.escape(n)}'/>"
+        if b is not None
+        else f"<h3>{html.escape(n)}</h3><p>Imagen no disponible</p>"
+        for n, b in imagenes
+    )
+    comp_filas = "".join(
+        f"<tr><td>{n}</td><td>{it.cv_mean:.4f} ± {it.cv_std:.4f}</td>"
+        f"<td>{it.holdout:.4f}</td><td>{it.delta:+.4f}</td></tr>"
+        for n, it in (
+            ("F1_0", comp.f1_0),
+            ("Recall_0", comp.recall_0),
+            ("Precision_0", comp.precision_0),
+            ("BalancedAccuracy", comp.balanced_accuracy),
+        )
+    )
+    html_doc = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>{html.escape(titulo)}</title></head>
+<body>
+<h1>{html.escape(titulo)}</h1>
+<h2>Modelo final</h2>
+<p>Modelo: {html.escape(str(resultado.nombre_modelo_final))}<br>
+Best params: {html.escape(str(resultado.hiperparametros_finales))}</p>
+<h2>Métricas holdout (riesgo = clase 0)</h2>
+<table border="1">
+<tr><th>Métrica</th><th>Modelo final</th><th>Heurístico</th></tr>
+<tr><td>Precision_0</td><td>{_f(ml.metricas.precision_0)}</td>
+<td>{_f(heu.metricas.precision_0)}</td></tr>
+<tr><td>Recall_0</td><td>{_f(ml.metricas.recall_0)}</td>
+<td>{_f(heu.metricas.recall_0)}</td></tr>
+<tr><td>F1_0</td><td>{_f(ml.metricas.f1_0)}</td>
+<td>{_f(heu.metricas.f1_0)}</td></tr>
+<tr><td>BalancedAccuracy</td><td>{_f(ml.metricas.balanced_accuracy)}</td>
+<td>{_f(heu.metricas.balanced_accuracy)}</td></tr>
+<tr><td>Accuracy contextual</td><td>{_f(ml.metricas.accuracy_ctx)}</td><td>n/a</td></tr>
+</table>
+<h2>Matriz de confusión</h2>
+<table border="1">
+<tr><th></th><th>pred_riesgo(0)</th><th>pred_pago(1)</th></tr>
+<tr><td>real_riesgo(0)</td>
+<td>{ml.matriz_nombres["riesgo_real_predicho_riesgo"]}</td>
+<td>{ml.matriz_nombres["riesgo_real_predicho_pago"]}</td></tr>
+<tr><td>real_pago(1)</td>
+<td>{ml.matriz_nombres["pago_real_predicho_riesgo"]}</td>
+<td>{ml.matriz_nombres["pago_real_predicho_pago"]}</td></tr>
+</table>
+<h2>CV final vs Holdout</h2>
+<table border="1">
+<tr><th>Métrica</th><th>CV mean ± std</th><th>Holdout</th><th>Delta</th></tr>
+{comp_filas}</table>
+<h2>Probabilísticas (riesgo)</h2>
+{prob_html}
+<h2>Inferencia</h2>
+<p>mediana total ms: {tim.median_total_ms:.3f}<br>
+rows/s: {tim.rows_per_second:.1f}</p>
+<h2>Estadística exploratoria</h2>
+<p>ANOVA F={est.anova_statistic:.4f} p={est.anova_pvalue:.4g}<br>
+{html.escape(est.anova_advertencia)}<br>
+{html.escape(est.tukey_mensaje)}<br>
+Friedman chi2={est.friedman_statistic:.4f} p={est.friedman_pvalue:.4g}<br>
+{html.escape(est.friedman_advertencia)}</p>
+<table border="1">
+<tr><th>Par</th><th>diff</th><th>p</th><th>IC95%</th><th>Significativo</th></tr>
+{filas_tukey}</table>
+<h2>Advertencias metodológicas</h2>
+<ul>{advertencias}</ul>
+{imagenes_html}
+</body>
+</html>
+"""
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(html_doc, encoding="utf-8")
+    return destino
 
 
 def _imprimir_evaluacion(resultado: ResultadoEvaluacionCompleta) -> None:
