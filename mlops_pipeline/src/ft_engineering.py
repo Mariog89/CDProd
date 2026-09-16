@@ -61,6 +61,33 @@ FEATURES_V1 = [*FEATURES_NUMERICAS, *FEATURES_NOMINALES]
 
 FEATURE_SCHEMA_VERSION = "1"
 
+# Inputs RAW canónicos necesarios para reconstruir FEATURES_V1.
+# Verificado contra crear_features()/preparar_features_inferencia():
+# - las 12 COLUMNAS_NUMERICAS_BASE alimentan FEATURES_NUMERICAS;
+# - salario_cliente + cuota_pactada derivan ratio_cuota_ingreso;
+# - tipo_credito + tipo_laboral pasan directo a nominales;
+# - tendencia_ingresos deriva tendencia_ingresos_limpia.
+# fecha_prestamo/puntaje/huella/saldos se normalizan si vienen, pero NO son
+# necesarios para FEATURES_V1 y quedan fuera de esta whitelist.
+# No cambia FEATURES_V1: solo formaliza sus inputs RAW.
+RAW_FEATURES_V1 = (
+    "tipo_credito",
+    "capital_prestado",
+    "plazo_meses",
+    "edad_cliente",
+    "tipo_laboral",
+    "salario_cliente",
+    "total_otros_prestamos",
+    "cuota_pactada",
+    "puntaje_datacredito",
+    "cant_creditosvigentes",
+    "creditos_sectorFinanciero",
+    "creditos_sectorCooperativo",
+    "creditos_sectorReal",
+    "promedio_ingresos_datacredito",
+    "tendencia_ingresos",
+)
+
 # Nota: "puntaje" (interno, casi constante en el EDA) se excluye de FEATURES_V1.
 # "puntaje_datacredito" (externo, con señal de riesgo) sí pertenece a FEATURES_V1.
 # No confundirlas: son variables distintas con distinto origen y utilidad.

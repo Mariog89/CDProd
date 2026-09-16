@@ -391,3 +391,84 @@ def test_28_log_no_llama_training():
     assert ".fit(" not in fuente
     assert "entrenar(" not in fuente
     assert "evaluar(" not in fuente
+
+
+def _registro_pii():
+    base = _registro()
+    base.update(
+        {
+            "nombre": "Juan Pérez",
+            "cedula": "123456789",
+            "email": "juan@example.com",
+            "telefono": "3001234567",
+            "Pago_atiempo": "1",
+        }
+    )
+    return base
+
+
+def test_29_log_header_fijo_entre_schemas(monkeypatch):
+    import csv as _csv
+
+    cliente, _ = _cliente_listo(monkeypatch)
+    assert cliente.post("/predict_batch", json={"records": [_registro()]}).status_code == 200
+    assert cliente.post("/predict_batch", json={"records": [_registro_pii()]}).status_code == 200
+    ruta = Path(os.environ["PREDICTION_LOG_PATH"])
+    with open(ruta, encoding="utf-8", newline="") as archivo:
+        lector = _csv.DictReader(archivo)
+        encabezado = list(lector.fieldnames or [])
+        filas = list(lector)
+    from mlops_pipeline.src.ft_engineering import RAW_FEATURES_V1
+
+    esperado = [
+        "request_id",
+        "prediction_timestamp",
+        "model_version",
+        "prediction",
+        "risk_probability",
+        "risk_score",
+        *[f"raw_{k}" for k in RAW_FEATURES_V1],
+    ]
+    assert encabezado == esperado
+    assert len(filas) == 2
+    plano = " ".join(f"{k}={v}" for f in filas for k, v in f.items())
+    for prohibida in (
+        "nombre",
+        "cedula",
+        "email",
+        "telefono",
+        "Pago_atiempo",
+        "Juan",
+        "123456789",
+        "juan@example.com",
+        "3001234567",
+    ):
+        assert prohibida not in plano
+    assert filas[0]["raw_tipo_credito"] == "4"
+    assert filas[1]["raw_tipo_credito"] == "4"
+    assert filas[0]["raw_salario_cliente"] != ""
+
+
+def test_30_log_append_valido_y_monitor_compatible(monkeypatch, tmp_path):
+    import csv as _csv
+
+    from mlops_pipeline.src.model_monitoring import cargar_tabla_predicciones
+
+    cliente, _ = _cliente_listo(monkeypatch)
+    for _ in range(3):
+        assert cliente.post("/predict_batch", json={"records": [_registro()]}).status_code == 200
+    ruta = Path(os.environ["PREDICTION_LOG_PATH"])
+    with open(ruta, encoding="utf-8", newline="") as archivo:
+        filas = list(_csv.DictReader(archivo))
+    assert len(filas) == 3
+    assert len({f["request_id"] for f in filas}) == 3
+    tabla = cargar_tabla_predicciones(ruta)
+    assert len(tabla) == 3
+    from mlops_pipeline.src.ft_engineering import (
+        FEATURES_V1,
+        preparar_features_inferencia,
+    )
+
+    crudas = {c[4:]: [f[c] for f in filas] for c in filas[0] if c.startswith("raw_")}
+    equis = preparar_features_inferencia(pd.DataFrame(crudas))
+    assert list(equis.columns) == list(FEATURES_V1)

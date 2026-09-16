@@ -38,12 +38,12 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-      # Cobertura del código productivo real (mlops_pipeline/src).
+      # Cobertura del código productivo real (mlops_pipeline/src, app.py, scripts/).
       # Bloqueante: si coverage.xml no puede generarse, el CI debe fallar.
       # Sin fail-under todavía: el umbral se definirá cuando Stage 3 lo decida.
       - name: Coverage report
         if: always()
-        run: pytest -q --cov=mlops_pipeline/src --cov-report=term-missing --cov-report=xml:coverage.xml tests/
+        run: pytest -q --cov=mlops_pipeline/src --cov=app --cov=scripts --cov-report=term-missing --cov-report=xml:coverage.xml tests/
 
       - name: SonarCloud scan
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
