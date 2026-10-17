@@ -6,6 +6,7 @@ distribución del target y compatibilidad con preparar_datos().
 
 import pandas as pd
 import pytest
+from google.auth.exceptions import DefaultCredentialsError
 
 pytestmark = pytest.mark.bq_live
 
@@ -19,21 +20,17 @@ from mlops_pipeline.src.Cargar_datos import (  # noqa: E402
 )
 from mlops_pipeline.src.ft_engineering import preparar_datos  # noqa: E402
 
-try:
-    from google.auth.exceptions import DefaultCredentialsError
-
-    _cred_error = DefaultCredentialsError
-except ImportError:  # pragma: no cover
-    _cred_error = Exception
-
 
 def _requiere_adc():
+    """Solo omite si faltan credenciales ADC.
+
+    Con CDPROD_BQ_LIVE=1, cualquier otro error (conexion, permisos,
+    configuracion, ejecucion) se propaga y falla la prueba.
+    """
     try:
         bq.Client(project="cdprod-upb-mg")
-    except _cred_error as exc:
+    except DefaultCredentialsError as exc:
         pytest.skip(f"sin ADC: {exc}")
-    except Exception as exc:  # pragma: no cover - red/experiencia
-        pytest.skip(f"BigQuery no accesible: {type(exc).__name__}")
 
 
 def test_bigquery_dimensiones_y_esquema():
