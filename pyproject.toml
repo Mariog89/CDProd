@@ -1,7 +1,7 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "data_regression: pruebas de regresión/integración que dependen del contenido concreto de Base_de_datos.csv",
+    "data_regression: pruebas de regresión/integración que dependen del contenido concreto de la tabla novabank_dev.Creditos",
 ]
 
 [tool.coverage.run]

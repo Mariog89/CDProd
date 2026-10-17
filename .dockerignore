@@ -12,7 +12,7 @@ __pycache__
 coverage.xml
 tests
 artifacts
-Base_de_datos.csv
+*.csv
 *.ipynb
 .ipynb_checkpoints
 .vscode

@@ -6,7 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "mlops_pipeline" / "src" / "config.json"
 
-EXPECTED_KEYS = {"data_file", "separator", "encoding", "target"}
+EXPECTED_KEYS = {"bq_project", "bq_dataset", "bq_table", "target"}
 
 
 def _load_config():
@@ -29,16 +29,16 @@ def test_config_contains_expected_keys():
 
 def test_config_value_types():
     config = _load_config()
-    assert isinstance(config["data_file"], str)
-    assert isinstance(config["separator"], str)
-    assert isinstance(config["encoding"], str)
+    assert isinstance(config["bq_project"], str)
+    assert isinstance(config["bq_dataset"], str)
+    assert isinstance(config["bq_table"], str)
     assert isinstance(config["target"], str)
 
 
-def test_data_file_resolves_to_existing_file():
+def test_bigquery_table_identifier_is_complete():
     config = _load_config()
-    data_path = REPO_ROOT / config["data_file"]
-    assert data_path.is_file(), f"no existe {data_path}"
+    tabla = f"{config['bq_project']}.{config['bq_dataset']}.{config['bq_table']}"
+    assert tabla == "cdprod-upb-mg.novabank_dev.Creditos"
 
 
 def test_target_is_not_empty():
