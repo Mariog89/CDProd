@@ -8,9 +8,9 @@ Analizar la información disponible sobre créditos y clientes con el fin de ide
 
 Disponible actualmente:
 
-- `Base_de_datos.csv` en la raíz del repositorio.
+- Datos en Google BigQuery (`cdprod-upb-mg.novabank_dev.Creditos`): 10.763 registros sintéticos, 23 columnas.
 - Pipeline de Stage 3 en `mlops_pipeline/src/`.
-- `Cargar_datos.py`: carga reproducible de configuración y datos crudos.
+- `Cargar_datos.py`: carga reproducible desde BigQuery vía ADC (todo como string, orden determinista).
 - `ft_engineering.py`: feature engineering reproducible sin leakage (16 features v1, split 80/20 estratificado).
 - `hueristic_model.py`: baseline heurístico de negocio fijo y explicable (reglas R1/R2/R3 congeladas).
 - `model_training.py`: comparación CV-safe de familias ML, selección, tuning y fit final sobre train.
@@ -47,7 +47,6 @@ CDProd/
 ├── app.py
 ├── Dockerfile
 ├── .dockerignore
-├── Base_de_datos.csv
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml
@@ -98,22 +97,40 @@ Para reproducir el entorno validado del proyecto, seleccione el kernel `Python C
 
 ## Configuración
 
-`mlops_pipeline/src/config.json` contiene la configuración actual de lectura de datos y variable objetivo:
+`mlops_pipeline/src/config.json` contiene la configuración BigQuery y la variable objetivo:
 
-- `data_file`: nombre del archivo de datos en la raíz del proyecto.
-- `separator`: separador de columnas del CSV.
-- `encoding`: codificación del archivo CSV.
-- `target`: variable objetivo prevista para el modelado futuro.
+- `bq_project`: proyecto GCP (`cdprod-upb-mg`).
+- `bq_dataset`: dataset (`novabank_dev`).
+- `bq_table`: tabla (`Creditos`).
+- `target`: variable objetivo (`Pago_atiempo`).
 
 ## Datos
 
-El archivo `Base_de_datos.csv` contiene registros históricos de créditos con información sobre:
+La tabla `cdprod-upb-mg.novabank_dev.Creditos` contiene registros históricos sintéticos de créditos con información sobre:
 
 - Características del crédito y el cliente.
 - Historial crediticio y puntajes.
 - Saldos, cuotas y cumplimiento de pagos.
 
-El archivo se encuentra en la raíz del repositorio, que es la ubicación esperada por `Cargar_datos.py` a través de `mlops_pipeline/src/config.json`.
+Los datos permanecen en BigQuery: el repositorio solo contiene código y configuración. La carga usa Application Default Credentials (ADC); en CI las pruebas usan mocks y DataFrames sintéticos, sin credenciales GCP. Los tests de integración reales (`data_regression`, `bq_live`) solo se ejecutan con `CDPROD_BQ_LIVE=1`.
+
+La consulta centralizada en `Cargar_datos.py` aplica `CAST(col AS STRING)` a las 23 columnas y `ORDER BY` sobre las 23 columnas crudas. Las 10.763 tuplas son únicas como multiconjunto, por lo que el orden es total y determinista entre ejecuciones. No reproduce el orden del antiguo CSV local: el split 80/20 conserva los conteos (train 8610: 8201/409; eval 2153: 2051/102) pero la composición de cada partición puede diferir.
+
+## Resultados del modelo por fuente de datos
+
+Históricos (CSV local `Base_de_datos.csv`, partición por orden de archivo):
+
+- Modelo: `LogisticRegression`, `model__C = 0.1`.
+- CV: F1_0 ≈ 0.1322 ± 0.0084, Recall_0 ≈ 0.5891.
+- Holdout: F1_0 ≈ 0.1429, Recall_0 ≈ 0.6569, Precision_0 ≈ 0.0801, Balanced Accuracy ≈ 0.6410, ROC-AUC ≈ 0.6786.
+
+Experimentales (BigQuery `novabank_dev.Creditos`, partición por orden determinista BQ, mismo código sin cambios):
+
+- Modelo: `LogisticRegression`, `model__C = 10.0`.
+- CV: F1_0 ≈ 0.1364 ± 0.0164, Recall_0 ≈ 0.5917.
+- Holdout: F1_0 ≈ 0.1196, Recall_0 ≈ 0.5294, Precision_0 ≈ 0.0674, Balanced Accuracy ≈ 0.5826, ROC-AUC ≈ 0.5995.
+
+Los holdouts son particiones diferentes, por lo que estas cifras no deben interpretarse como mejora o degradación del modelo. El artefacto servido por FastAPI (`artifacts/1.0.0`) conserva su trazabilidad en `metadata.json` (`model_version`, `random_state`, hiperparámetros); un artefacto reexportado desde BigQuery quedará registrado con sus propios hiperparámetros y métricas CV.
 
 ## Endpoint de predicción batch
 
@@ -180,7 +197,7 @@ docker run --rm `
 `model_evaluation.generar_pestana_metricas(resultado, ruta)` genera `runtime/metrics.html` (ignorada por Git) solo con datos existentes del `ResultadoEvaluacionCompleta`: modelo, best params, precision/recall/F1/balanced/accuracy, matriz, CV vs holdout, ROC-AUC/AP, ANOVA/Tukey/Friedman, advertencias e imágenes de `plot_*`. No recalcula nada.
 
 ```bat
-.\codigoproyecto-venv\Scripts\python.exe -c "from mlops_pipeline.src.Cargar_datos import cargar_config,cargar_datos,encontrar_raiz_proyecto,resolver_ruta_datos; from mlops_pipeline.src.ft_engineering import preparar_datos; from mlops_pipeline.src.model_training import entrenar; from mlops_pipeline.src.model_evaluation import evaluar,generar_pestana_metricas; r=encontrar_raiz_proyecto(); c=cargar_config(r/'mlops_pipeline/src/config.json'); d=preparar_datos(cargar_datos(resolver_ruta_datos(r,c),c)); print(generar_pestana_metricas(evaluar(entrenar(d.X_train,d.y_train,d.preprocessor),d.X_eval,d.y_eval)))"
+.\codigoproyecto-venv\Scripts\python.exe -c "from mlops_pipeline.src.Cargar_datos import cargar_config,cargar_datos,encontrar_raiz_proyecto; from mlops_pipeline.src.ft_engineering import preparar_datos; from mlops_pipeline.src.model_training import entrenar; from mlops_pipeline.src.model_evaluation import evaluar,generar_pestana_metricas; r=encontrar_raiz_proyecto(); c=cargar_config(r/'mlops_pipeline/src/config.json'); d=preparar_datos(cargar_datos(c)); print(generar_pestana_metricas(evaluar(entrenar(d.X_train,d.y_train,d.preprocessor),d.X_eval,d.y_eval)))"
 ```
 
 Servida por la API sin reevaluar: `GET /metrics` (ruta configurable con `METRICS_HTML_PATH`, default `runtime/metrics.html`; 404 claro si aún no se generó).

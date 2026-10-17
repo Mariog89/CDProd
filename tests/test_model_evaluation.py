@@ -559,8 +559,7 @@ def test_31_main_usa_train_y_eval_despues(monkeypatch):
     )
     monkeypatch.setattr(ev, "encontrar_raiz_proyecto", lambda: Path("/tmp"))
     monkeypatch.setattr(ev, "cargar_config", lambda _r: {})
-    monkeypatch.setattr(ev, "resolver_ruta_datos", lambda _a, _b: Path("/tmp/d.csv"))
-    monkeypatch.setattr(ev, "cargar_datos", lambda _r, _c: object())
+    monkeypatch.setattr(ev, "cargar_datos", lambda _c: object())
     monkeypatch.setattr(ev, "preparar_datos", lambda _df: datos_fake)
     llamadas: dict = {}
 
@@ -658,13 +657,12 @@ def test_data_regression_flujo_real_eval_unica():
         cargar_config,
         cargar_datos,
         encontrar_raiz_proyecto,
-        resolver_ruta_datos,
     )
     from mlops_pipeline.src.ft_engineering import preparar_datos
 
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    datos = preparar_datos(cargar_datos(resolver_ruta_datos(raiz, config), config))
+    datos = preparar_datos(cargar_datos(config))
     assert datos.X_eval.shape == (2153, 16)
     resultado_entrenamiento = mt.entrenar(datos.X_train, datos.y_train, datos.preprocessor)
     resultado = ev.evaluar(resultado_entrenamiento, datos.X_eval, datos.y_eval)

@@ -44,7 +44,6 @@ from mlops_pipeline.src.Cargar_datos import (  # noqa: E402
     cargar_config,
     cargar_datos,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 from mlops_pipeline.src.ft_engineering import preparar_datos  # noqa: E402
 from mlops_pipeline.src.hueristic_model import predecir_heuristico  # noqa: E402
@@ -821,7 +820,7 @@ def main() -> None:
     """Carga datos, entrena solo con train y evalúa una vez sobre X_eval/y_eval."""
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    df = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    df = cargar_datos(config)
     datos = preparar_datos(df)
     resultado_entrenamiento = entrenar(datos.X_train, datos.y_train, datos.preprocessor)
     resultado = evaluar(resultado_entrenamiento, datos.X_eval, datos.y_eval)

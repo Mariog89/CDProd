@@ -1,4 +1,4 @@
-"""Pruebas del loader reproducible de Stage 3 (config + datos crudos)."""
+"""Pruebas del loader BigQuery de Stage 3 (config + datos crudos)."""
 
 import json
 
@@ -6,10 +6,12 @@ import pandas as pd
 import pytest
 
 from mlops_pipeline.src.Cargar_datos import (
+    COLUMNAS_CRUDAS,
     cargar_config,
     cargar_datos,
+    construir_consulta,
+    construir_tabla,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 
 FILAS_ESPERADAS = 10763
@@ -29,22 +31,59 @@ def test_raiz_contiene_config_stage3():
 
 def test_stage3_config_carga_y_claves_minimas():
     _, config = _raiz_y_config()
-    assert {"data_file", "separator", "encoding", "target"}.issubset(config.keys())
+    assert {"bq_project", "bq_dataset", "bq_table", "target"}.issubset(config.keys())
 
 
-def test_data_file_se_resuelve():
-    raiz, config = _raiz_y_config()
-    ruta = resolver_ruta_datos(raiz, config)
-    assert ruta.is_file()
-    assert ruta.name == config["data_file"]
+def test_tabla_bigquery_bien_formada():
+    _, config = _raiz_y_config()
+    assert construir_tabla(config) == "cdprod-upb-mg.novabank_dev.Creditos"
 
 
-@pytest.mark.data_regression
+def test_consulta_ordena_y_castea():
+    _, config = _raiz_y_config()
+    consulta = construir_consulta(config)
+    assert "CAST(Pago_atiempo AS STRING)" in consulta
+    assert "ORDER BY" in consulta
+    assert consulta.count("CAST(") == COLUMNAS_ESPERADAS
+
+
+class _FakeJob:
+    def __init__(self, marco):
+        self._marco = marco
+
+    def to_dataframe(self):
+        return self._marco
+
+
+class _FakeClient:
+    def __init__(self, marco):
+        self._marco = marco
+        self.consultas = []
+
+    def query(self, consulta):
+        self.consultas.append(consulta)
+        return _FakeJob(self._marco)
+
+
+def _crudo_sintetico(n=8):
+    return pd.DataFrame({c: [str(i) for i in range(n)] for c in COLUMNAS_CRUDAS})
+
+
 def test_cargar_datos_devuelve_dataframe_esperado():
-    raiz, config = _raiz_y_config()
-    df = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    _, config = _raiz_y_config()
+    cliente = _FakeClient(_crudo_sintetico())
+    df = cargar_datos(config, client=cliente)
     assert isinstance(df, pd.DataFrame)
-    assert df.shape == (FILAS_ESPERADAS, COLUMNAS_ESPERADAS)
+    assert list(df.columns) == list(COLUMNAS_CRUDAS)
+    assert len(df) == 8
+    assert len(cliente.consultas) == 1
+    assert "cdprod-upb-mg.novabank_dev.Creditos" in cliente.consultas[0]
+
+
+def test_cargar_datos_todo_string():
+    _, config = _raiz_y_config()
+    df = cargar_datos(config, client=_FakeClient(_crudo_sintetico()))
+    assert all(str(t) == "string" for t in df.dtypes)
 
 
 def test_config_inexistente_error_claro(tmp_path):
@@ -61,7 +100,7 @@ def test_config_json_invalido_error_claro(tmp_path):
 
 def test_config_sin_claves_minimas_error_claro(tmp_path):
     ruta = tmp_path / "config.json"
-    ruta.write_text(json.dumps({"data_file": "x.csv"}), encoding="utf-8")
+    ruta.write_text(json.dumps({"bq_project": "x"}), encoding="utf-8")
     with pytest.raises(ValueError, match="[Ff]altantes"):
         cargar_config(ruta)
 
@@ -71,10 +110,3 @@ def test_config_no_objeto_error_claro(tmp_path):
     ruta.write_text(json.dumps(["no", "objeto"]), encoding="utf-8")
     with pytest.raises(ValueError, match="[Oo]bjeto"):
         cargar_config(ruta)
-
-
-def test_data_file_inexistente_error_claro(tmp_path):
-    _, config = _raiz_y_config()
-    config = dict(config, data_file="inexistente.csv")
-    with pytest.raises(FileNotFoundError, match="datos"):
-        resolver_ruta_datos(tmp_path, config)

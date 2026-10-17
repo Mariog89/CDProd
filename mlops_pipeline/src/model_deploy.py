@@ -40,7 +40,6 @@ from mlops_pipeline.src.Cargar_datos import (  # noqa: E402
     cargar_config,
     cargar_datos,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 from mlops_pipeline.src.ft_engineering import (  # noqa: E402
     FEATURE_SCHEMA_VERSION,
@@ -332,7 +331,7 @@ def main() -> None:
     """Demo académica temporal: entrena con train, guarda, carga y predice."""
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    df_completo = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    df_completo = cargar_datos(config)
     datos = preparar_datos(df_completo)
     resultado = entrenar(datos.X_train, datos.y_train, datos.preprocessor)
     df_demo = df_completo.head(5).copy()

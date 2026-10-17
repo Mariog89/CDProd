@@ -1,7 +1,12 @@
 """Carga reproducible de configuración y datos crudos del Stage 3.
 
-Lee mlops_pipeline/src/config.json, resuelve la ruta del dataset
-desde config["data_file"] y lo carga sin limpieza ni transformaciones.
+Lee mlops_pipeline/src/config.json y obtiene los registros desde Google
+BigQuery (config["bq_project/bq_dataset/bq_table"]) como pandas.DataFrame
+con todo como string, sin limpieza ni transformaciones.
+
+El orden es determinista (ORDER BY sobre las 23 columnas crudas, únicas como
+tupla) pero NO reproduce el orden del antiguo Base_de_datos.csv: cualquier
+métrica sensible al orden puede variar respecto a corridas históricas.
 """
 
 import json
@@ -10,7 +15,33 @@ from pathlib import Path
 import pandas as pd
 
 CONFIG_MARCADOR = "mlops_pipeline/src/config.json"
-CLAVES_MINIMAS = {"data_file", "separator", "encoding", "target"}
+CLAVES_MINIMAS = {"bq_project", "bq_dataset", "bq_table", "target"}
+
+COLUMNAS_CRUDAS = (
+    "tipo_credito",
+    "fecha_prestamo",
+    "capital_prestado",
+    "plazo_meses",
+    "edad_cliente",
+    "tipo_laboral",
+    "salario_cliente",
+    "total_otros_prestamos",
+    "cuota_pactada",
+    "puntaje",
+    "puntaje_datacredito",
+    "cant_creditosvigentes",
+    "huella_consulta",
+    "saldo_mora",
+    "saldo_total",
+    "saldo_principal",
+    "saldo_mora_codeudor",
+    "creditos_sectorFinanciero",
+    "creditos_sectorCooperativo",
+    "creditos_sectorReal",
+    "promedio_ingresos_datacredito",
+    "tendencia_ingresos",
+    "Pago_atiempo",
+)
 
 
 def encontrar_raiz_proyecto(
@@ -52,19 +83,33 @@ def cargar_config(ruta_config: Path) -> dict:
     return config
 
 
-def resolver_ruta_datos(raiz: Path, config: dict) -> Path:
-    """Construye DATA_PATH como raíz / config["data_file"] y verifica que exista."""
-    ruta_datos = raiz / config["data_file"]
-    if not ruta_datos.is_file():
-        raise FileNotFoundError(f"No existe el archivo de datos: {ruta_datos}")
-    return ruta_datos
+def construir_tabla(config: dict) -> str:
+    """Devuelve el identificador completo proyecto.dataset.tabla del config."""
+    return f"{config['bq_project']}.{config['bq_dataset']}.{config['bq_table']}"
 
 
-def cargar_datos(ruta_datos: Path, config: dict) -> pd.DataFrame:
-    """Carga el CSV crudo con separator/encoding del config y todo como string."""
-    return pd.read_csv(
-        ruta_datos,
-        sep=config["separator"],
-        encoding=config["encoding"],
-        dtype="string",
-    )
+def construir_consulta(config: dict) -> str:
+    """SELECT con CAST explícito a STRING y ORDER BY determinista.
+
+    Las 23 tuplas crudas son únicas en la tabla, por lo que ordenar por
+    todas las columnas produce un orden total reproducible. No reproduce
+    el orden del antiguo CSV local.
+    """
+    tabla = construir_tabla(config)
+    columnas = ", ".join(f"CAST({c} AS STRING) AS {c}" for c in COLUMNAS_CRUDAS)
+    orden = ", ".join(COLUMNAS_CRUDAS)
+    return f"SELECT {columnas} FROM {tabla} ORDER BY {orden}"
+
+
+def cargar_datos(config: dict, client=None) -> pd.DataFrame:
+    """Obtiene el crudo desde BigQuery como DataFrame todo-string.
+
+    Usa Application Default Credentials salvo que se inyecte `client`
+    (tests). La consulta vive solo en esta capa de carga.
+    """
+    if client is None:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=config["bq_project"])
+    marco = client.query(construir_consulta(config)).to_dataframe()
+    return marco.astype("string")[list(COLUMNAS_CRUDAS)]

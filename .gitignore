@@ -23,6 +23,10 @@ Thumbs.db
 *.tmp
 *.log
 
+# Dataset local retirado: la fuente canónica es BigQuery
+# (cdprod-upb-mg.novabank_dev.Creditos). No versionar copias.
+Base_de_datos.csv
+
 # Artefactos de modelo (no versionar)
 artifacts/
 

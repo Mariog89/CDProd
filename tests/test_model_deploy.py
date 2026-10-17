@@ -691,9 +691,8 @@ def test_48_main_orquestacion_con_mocks(monkeypatch, tmp_path, capsys):
     llamadas: dict = {}
     monkeypatch.setattr(md, "encontrar_raiz_proyecto", lambda: Path("/tmp"))
     monkeypatch.setattr(md, "cargar_config", lambda _r: {})
-    monkeypatch.setattr(md, "resolver_ruta_datos", lambda _a, _b: Path("/tmp/d.csv"))
 
-    def falso_cargar(_r, _c):
+    def falso_cargar(_c):
         llamadas["cargar"] = True
         return df_completo
 

@@ -2,7 +2,7 @@
 
 Flujo exclusivo con train (sin holdout):
 
-Base_de_datos.csv -> preparar_datos() -> entrenar(X_train, y_train)
+BigQuery(Creditos) -> preparar_datos() -> entrenar(X_train, y_train)
 -> crear_metadata_modelo(metricas_holdout_finales=None)
 -> guardar_modelo(..., artifacts/1.0.0)
 
@@ -23,7 +23,6 @@ from mlops_pipeline.src.Cargar_datos import (  # noqa: E402
     cargar_config,
     cargar_datos,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 from mlops_pipeline.src.ft_engineering import preparar_datos  # noqa: E402
 from mlops_pipeline.src.model_deploy import (  # noqa: E402
@@ -57,7 +56,7 @@ def exportar(output: Path, overwrite: bool = False) -> dict:
     """Genera el artefacto usando solo X_train/y_train/preprocessor."""
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    df = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    df = cargar_datos(config)
     datos = preparar_datos(df)
     resultado = entrenar(datos.X_train, datos.y_train, datos.preprocessor)
     estimador = resultado.modelo_final_fitted

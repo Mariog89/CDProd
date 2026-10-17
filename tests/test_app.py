@@ -293,8 +293,7 @@ def test_21_export_respeta_output_y_overwrite(monkeypatch, tmp_path):
 
     monkeypatch.setattr(exp, "encontrar_raiz_proyecto", lambda: Path("."))
     monkeypatch.setattr(exp, "cargar_config", lambda ruta: {})
-    monkeypatch.setattr(exp, "resolver_ruta_datos", lambda raiz, cfg: Path("x"))
-    monkeypatch.setattr(exp, "cargar_datos", lambda ruta, cfg: pd.DataFrame())
+    monkeypatch.setattr(exp, "cargar_datos", lambda cfg: pd.DataFrame())
     monkeypatch.setattr(
         exp,
         "preparar_datos",
