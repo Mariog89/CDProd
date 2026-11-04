@@ -321,8 +321,7 @@ def test_main_usa_solo_train_y_preprocessor(monkeypatch, capsys):
     datos_fake = SimpleNamespace(X_train=x_train, y_train=y_train, preprocessor=preprocessor)
     monkeypatch.setattr(mt, "encontrar_raiz_proyecto", lambda: Path("/tmp"))
     monkeypatch.setattr(mt, "cargar_config", lambda _ruta: {})
-    monkeypatch.setattr(mt, "resolver_ruta_datos", lambda _raiz, _cfg: Path("/tmp/d.csv"))
-    monkeypatch.setattr(mt, "cargar_datos", lambda _ruta, _cfg: object())
+    monkeypatch.setattr(mt, "cargar_datos", lambda _cfg: object())
     monkeypatch.setattr(mt, "preparar_datos", lambda _df: datos_fake)
     llamadas: dict = {}
 

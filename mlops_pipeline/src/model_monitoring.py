@@ -62,7 +62,7 @@ ALERT_TYPES = (
     "performance",
 )
 
-# Raw columns known from Base_de_datos.csv. Anything else is reported as extra.
+# Raw columns known from novabank_dev.Creditos. Anything else is reported as extra.
 # Authority for serving is still preparar_features_inferencia, this list only
 # supports descriptive raw-quality reporting.
 COLUMNAS_CRUDAS_CONOCIDAS = [
@@ -1536,7 +1536,6 @@ def main() -> None:
         cargar_config,
         cargar_datos,
         encontrar_raiz_proyecto,
-        resolver_ruta_datos,
     )
     from mlops_pipeline.src.ft_engineering import preparar_datos
     from mlops_pipeline.src.model_deploy import crear_metadata_modelo, predecir
@@ -1544,7 +1543,7 @@ def main() -> None:
 
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    df_completo = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    df_completo = cargar_datos(config)
     datos = preparar_datos(df_completo)
     resultado_ent = entrenar(datos.X_train, datos.y_train, datos.preprocessor)
     modelo = resultado_ent.modelo_final_fitted

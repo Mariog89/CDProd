@@ -15,7 +15,6 @@ from mlops_pipeline.src.Cargar_datos import (
     cargar_config,
     cargar_datos,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 from mlops_pipeline.src.ft_engineering import preparar_datos
 from mlops_pipeline.src.hueristic_model import (
@@ -212,7 +211,7 @@ def test_data_regression_heuristico_train():
     """
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    df = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    df = cargar_datos(config)
     datos = preparar_datos(df)
     modelo = HeuristicModel().fit(datos.X_train)
     y_pred = pd.Series(modelo.predict(datos.X_train), index=datos.y_train.index)

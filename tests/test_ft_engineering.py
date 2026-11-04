@@ -9,7 +9,6 @@ from mlops_pipeline.src.Cargar_datos import (
     cargar_config,
     cargar_datos,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 from mlops_pipeline.src.ft_engineering import (
     FEATURES_V1,
@@ -79,7 +78,7 @@ def _crudo_base(n=40, semilla=7):
 def _real_crudo():
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    return cargar_datos(resolver_ruta_datos(raiz, config), config)
+    return cargar_datos(config)
 
 
 def test_normalizar_tipos_convierte():

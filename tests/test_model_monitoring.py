@@ -733,8 +733,7 @@ def test_49_main_usa_train_y_sin_labels(monkeypatch, capsys):
     visto: dict = {}
     monkeypatch.setattr(cd, "encontrar_raiz_proyecto", lambda: Path("/tmp"))
     monkeypatch.setattr(cd, "cargar_config", lambda _r: {})
-    monkeypatch.setattr(cd, "resolver_ruta_datos", lambda _a, _b: Path("/tmp/d.csv"))
-    monkeypatch.setattr(cd, "cargar_datos", lambda _r, _c: df)
+    monkeypatch.setattr(cd, "cargar_datos", lambda _c: df)
 
     def falso_preparar(_df):
         assert "Pago_atiempo" in _df.columns

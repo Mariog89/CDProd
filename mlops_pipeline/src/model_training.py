@@ -45,7 +45,6 @@ from mlops_pipeline.src.Cargar_datos import (  # noqa: E402
     cargar_config,
     cargar_datos,
     encontrar_raiz_proyecto,
-    resolver_ruta_datos,
 )
 from mlops_pipeline.src.ft_engineering import (  # noqa: E402
     FEATURES_NOMINALES,
@@ -579,7 +578,7 @@ def main() -> None:
     """Ejecuta el protocolo completo solo con X_train/y_train y lo imprime."""
     raiz = encontrar_raiz_proyecto()
     config = cargar_config(raiz / "mlops_pipeline" / "src" / "config.json")
-    df = cargar_datos(resolver_ruta_datos(raiz, config), config)
+    df = cargar_datos(config)
     datos = preparar_datos(df)
     resultado = entrenar(datos.X_train, datos.y_train, datos.preprocessor)
     _imprimir_resultados(resultado)

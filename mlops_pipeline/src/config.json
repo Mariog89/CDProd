@@ -1,6 +1,6 @@
 {
-  "data_file": "Base_de_datos.csv",
-  "separator": ";",
-  "encoding": "utf-8-sig",
+  "bq_project": "cdprod-upb-mg",
+  "bq_dataset": "novabank_dev",
+  "bq_table": "Creditos",
   "target": "Pago_atiempo"
 }
