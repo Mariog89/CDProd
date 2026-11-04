@@ -23,6 +23,7 @@ line-length = 100
 exclude = [
     "*.ipynb",
     "codigoproyecto-venv/",
+    ".venv-ci/",
     ".atl/",
     "__pycache__/",
     ".pytest_cache/",

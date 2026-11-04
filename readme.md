@@ -41,9 +41,18 @@ CDProd/
 │       ├── model_monitoring.py
 │       └── config.json
 ├── scripts/
-│   └── export_model_artifact.py
+│   ├── export_model_artifact.py
+│   ├── validate_structure.py
+│   └── validate_metrics.py
+├── jenkins/
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── casc.yaml
+│   ├── plugins.txt
+│   └── .env.example
 ├── tests/
 ├── .github/
+├── Jenkinsfile
 ├── app.py
 ├── Dockerfile
 ├── .dockerignore
@@ -213,6 +222,34 @@ Servida por la API sin reevaluar: `GET /metrics` (ruta configurable con `METRICS
 ```bat
 .\codigoproyecto-venv\Scripts\python.exe -m mlops_pipeline.src.model_monitoring
 ```
+
+## Pipeline de aprobación con Jenkins
+
+`Jenkinsfile` (raíz) define el pipeline de aprobación; `jenkins/` contiene el entorno local reproducible (Docker Compose + configuración como código).
+
+Etapas:
+
+1. **Clonar repositorio** (`checkout scm` desde GitHub).
+2. **Preparar entorno Python** 3.13 con `uv` (`requirements.txt` + `requirements-dev.txt`, `pip check`).
+3. **Validar estructura de carpetas**: `scripts/validate_structure.py` (archivos de Stage 3, tests, Dockerfile, Jenkinsfile; sin CSV, modelos ni salidas versionadas).
+4. **Calidad de código**: Ruff lint y format en paralelo.
+5. **Pruebas unitarias**: pytest + cobertura (JUnit publicado en Jenkins).
+6. **Integración BigQuery**: tests `bq_live`/`data_regression` con `CDPROD_BQ_LIVE=1`.
+7. **Validar métricas de evaluación**: `scripts/validate_metrics.py` entrena y evalúa sobre el holdout y aplica el quality gate (mínimos: F1_0 ≥ 0.10, Recall_0 ≥ 0.40, Balanced Accuracy ≥ 0.55, ROC-AUC ≥ 0.55). Publica `metrics.json` y la pestaña HTML de métricas.
+8. **Construir imagen Docker** de la API (`cdprod-api:<build>`).
+9. **Aprobación** manual (`input`, 30 min) y **Publicar versión aprobada** (`cdprod-api:aprobado`).
+
+Trigger: Poll SCM cada ~2 minutos sobre `main` y `develop` (un merge dispara el flujo). Al terminar, en cualquier resultado, se envía un correo HTML con estado, duración, rama y métricas.
+
+Levantar Jenkins (requiere Docker Desktop y `gcloud auth application-default login`):
+
+```powershell
+cd jenkins
+copy .env.example .env   # completar admin, Gmail (contraseña de aplicación), NOTIFY_EMAIL y GCLOUD_ADC_FILE
+docker compose up -d --build
+```
+
+UI en `http://localhost:8080` (o `JENKINS_PORT`). El job `CDProd-aprobacion` se crea automáticamente vía JCasC; no hay asistente de instalación ni plugins manuales.
 
 ## Workflow Git
 

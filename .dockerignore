@@ -21,3 +21,7 @@ artifacts
 Thumbs.db
 *.tmp
 *.log
+.venv-ci
+reports
+jenkins
+Jenkinsfile

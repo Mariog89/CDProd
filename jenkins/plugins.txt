@@ -1,0 +1,12 @@
+workflow-aggregator
+git
+configuration-as-code
+job-dsl
+mailer
+pipeline-utility-steps
+pipeline-stage-view
+pipeline-graph-view
+htmlpublisher
+junit
+timestamper
+ws-cleanup

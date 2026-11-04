@@ -1,0 +1,58 @@
+# Configuración como código de Jenkins (JCasC). Los ${...} se leen de jenkins/.env.
+jenkins:
+  systemMessage: "CDProd · Jenkins local para el pipeline de aprobación (Entregable final CDP)"
+  numExecutors: 2
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "NOTIFY_EMAIL"
+            value: "${NOTIFY_EMAIL:-}"
+
+unclassified:
+  location:
+    url: "http://localhost:${JENKINS_PORT:-8080}/"
+    adminAddress: "${SMTP_USER:-jenkins@localhost}"
+  mailer:
+    smtpHost: "smtp.gmail.com"
+    smtpPort: "465"
+    useSsl: true
+    charset: "UTF-8"
+    authentication:
+      username: "${SMTP_USER:-}"
+      password: "${SMTP_APP_PASSWORD:-}"
+
+jobs:
+  - script: |
+      pipelineJob('CDProd-aprobacion') {
+        description('Pipeline de aprobación de CDProd: se dispara por Poll SCM al hacer merge a las ramas vigiladas.')
+        properties {
+          disableConcurrentBuilds()
+          pipelineTriggers {
+            triggers {
+              pollSCM { scmpoll_spec('H/2 * * * *') }
+            }
+          }
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('${CDPROD_REPO_URL:-https://github.com/Mariog89/CDProd.git}') }
+                branches(*'${CDPROD_BRANCHES:-*/main,*/develop}'.split(','))
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(false)
+          }
+        }
+      }
