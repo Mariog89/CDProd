@@ -1,0 +1,8 @@
+{
+  "dataset": "projects/895469831908/locations/us-central1/datasets/4871489895832485888",
+  "training_pipeline": "projects/895469831908/locations/us-central1/trainingPipelines/2300232828442378240",
+  "objetivo": "maximize-au-roc",
+  "budget_milli_node_hours": 1000,
+  "tabla": "cdprod-upb-mg.novabank_dev.creditos_vertex",
+  "consola": "https://console.cloud.google.com/vertex-ai/locations/us-central1/training/2300232828442378240?project=cdprod-upb-mg"
+}

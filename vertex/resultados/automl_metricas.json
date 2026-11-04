@@ -1,0 +1,39 @@
+{
+  "modelo": "projects/895469831908/locations/us-central1/models/6536861059674800128",
+  "batch_prediction_job": "projects/895469831908/locations/us-central1/batchPredictionJobs/8012019812878254080",
+  "evaluacion_nativa_vertex_test": {
+    "auRoc": 0.9666801,
+    "auPrc": 0.95941,
+    "logLoss": 0.1729202
+  },
+  "n_validate": 861,
+  "n_test": 2153,
+  "umbral_validacion": 0.11961577832698833,
+  "test_umbral_0_5": {
+    "roc_auc_risk": 0.6881626370684792,
+    "average_precision_risk": 0.14897367312827717,
+    "rmse_prob_riesgo": 0.21092293139099963,
+    "f1_0": 0.06779661016949153,
+    "recall_0": 0.0392156862745098,
+    "precision_0": 0.25,
+    "balanced_accuracy": 0.5166824408944465,
+    "accuracy": 0.9489084997677659,
+    "predichos_riesgo": 16,
+    "umbral": 0.5
+  },
+  "test_umbral_validacion": {
+    "roc_auc_risk": 0.6881626370684792,
+    "average_precision_risk": 0.14897367312827717,
+    "rmse_prob_riesgo": 0.21092293139099963,
+    "f1_0": 0.21105527638190955,
+    "recall_0": 0.20588235294117646,
+    "precision_0": 0.21649484536082475,
+    "balanced_accuracy": 0.5844136289328018,
+    "accuracy": 0.927078495123084,
+    "predichos_riesgo": 97,
+    "umbral": 0.11961577832698833
+  },
+  "tiempo_batch_prediction_s": 616.9,
+  "tabla_predicciones": "cdprod-upb-mg.novabank_dev.predictions_2026_11_04T09_57_11_821Z_863",
+  "tiempo_entrenamiento_min": 161.5
+}

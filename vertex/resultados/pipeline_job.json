@@ -1,0 +1,12 @@
+{
+  "pipeline_job": "projects/895469831908/locations/us-central1/pipelineJobs/cdprod-riesgo-custom-20261103222118",
+  "commit": "4a2fc811d7246e2d97413621066048ea829a7a7b",
+  "semillas": [
+    42,
+    7,
+    13,
+    21,
+    99
+  ],
+  "consola": "https://console.cloud.google.com/vertex-ai/locations/us-central1/pipelines/runs/cdprod-riesgo-custom-20261103222118?project=895469831908"
+}

@@ -1,0 +1,36 @@
+{
+  "tabla": "cdprod-upb-mg.novabank_dev.creditos_vertex",
+  "filas": 10763,
+  "columnas": [
+    "fila_id",
+    "tipo_credito",
+    "capital_prestado",
+    "plazo_meses",
+    "edad_cliente",
+    "tipo_laboral",
+    "salario_cliente",
+    "total_otros_prestamos",
+    "cuota_pactada",
+    "puntaje_datacredito",
+    "cant_creditosvigentes",
+    "creditos_sectorFinanciero",
+    "creditos_sectorCooperativo",
+    "creditos_sectorReal",
+    "promedio_ingresos_datacredito",
+    "tendencia_ingresos",
+    "Pago_atiempo",
+    "split"
+  ],
+  "conteos_split_por_clase": {
+    "0": {
+      "TEST": 102,
+      "TRAIN": 368,
+      "VALIDATE": 41
+    },
+    "1": {
+      "TEST": 2051,
+      "TRAIN": 7381,
+      "VALIDATE": 820
+    }
+  }
+}

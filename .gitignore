@@ -37,3 +37,6 @@ runtime/
 .venv-ci/
 reports/
 jenkins/.env
+
+# Vertex AI: scores por fila del holdout (se regeneran, no versionar)
+vertex/resultados/*.csv
