@@ -1,0 +1,27 @@
+{
+  "modelo": "logistic_regression",
+  "hiperparametros": {
+    "model__C": "10.0"
+  },
+  "n_test": 2153,
+  "test_umbral_0_5": {
+    "roc_auc_risk": 0.599511476945727,
+    "average_precision_risk": 0.09681852954552612,
+    "rmse_prob_riesgo": 0.4786560290325153,
+    "f1_0": 0.11960132890365449,
+    "recall_0": 0.5294117647058824,
+    "precision_0": 0.06741573033707865,
+    "balanced_accuracy": 0.5825995927381191,
+    "accuracy": 0.6307477937761263,
+    "predichos_riesgo": 801,
+    "umbral": 0.5
+  },
+  "cv_f1_0_mean": 0.13644939137752193,
+  "cv_f1_0_std": 0.016401013277168426,
+  "tiempo_carga_s": 9.33,
+  "tiempo_entrenamiento_s": 26.33,
+  "tiempo_inferencia_test_s": 0.0411,
+  "cpu_count": 12,
+  "procesador": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+  "python": "3.13.14"
+}

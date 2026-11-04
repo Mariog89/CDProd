@@ -1,0 +1,258 @@
+# PIPELINE DEFINITION
+# Name: cdprod-riesgo-custom
+# Description: Modelo de riesgo crediticio del repo CDProd entrenado en Vertex Pipelines.
+# Inputs:
+#    repo_zip: str
+#    semillas: list [Default: [42.0, 7.0, 13.0, 21.0, 99.0]]
+components:
+  comp-consolidar:
+    executorLabel: exec-consolidar
+    inputDefinitions:
+      parameters:
+        resultados:
+          parameterType: LIST
+    outputDefinitions:
+      artifacts:
+        resumen:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-entrenar-evaluar:
+    executorLabel: exec-entrenar-evaluar
+    inputDefinitions:
+      parameters:
+        repo_zip:
+          parameterType: STRING
+        semilla_split:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        clasificacion:
+          artifactType:
+            schemaTitle: system.ClassificationMetrics
+            schemaVersion: 0.0.1
+        metricas:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        modelo:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-for-loop-1:
+    dag:
+      outputs:
+        parameters:
+          pipelinechannel--entrenar-evaluar-Output:
+            valueFromParameter:
+              outputParameterKey: Output
+              producerSubtask: entrenar-evaluar
+      tasks:
+        entrenar-evaluar:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-entrenar-evaluar
+          inputs:
+            parameters:
+              repo_zip:
+                componentInputParameter: pipelinechannel--repo_zip
+              semilla_split:
+                componentInputParameter: pipelinechannel--semillas-loop-item
+          taskInfo:
+            name: entrenar-evaluar
+    inputDefinitions:
+      parameters:
+        pipelinechannel--repo_zip:
+          parameterType: STRING
+        pipelinechannel--semillas:
+          parameterType: LIST
+        pipelinechannel--semillas-loop-item:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        pipelinechannel--entrenar-evaluar-Output:
+          parameterType: LIST
+deploymentSpec:
+  executors:
+    exec-consolidar:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - consolidar
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==2.5.3'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef consolidar(resultados: list, resumen: Output[Metrics]) -> str:\n\
+          \    \"\"\"Media y desviaci\xF3n est\xE1ndar de cada m\xE9trica entre semillas\
+          \ (estabilidad).\"\"\"\n    import json\n\n    import numpy as np\n\n  \
+          \  filas = [json.loads(r) for r in resultados]\n    claves = (\n       \
+          \ \"f1_0\",\n        \"recall_0\",\n        \"precision_0\",\n        \"\
+          balanced_accuracy\",\n        \"accuracy\",\n        \"roc_auc_risk\",\n\
+          \        \"average_precision_risk\",\n        \"tiempo_entrenamiento_s\"\
+          ,\n    )\n    salida = {\"n_semillas\": len(filas), \"por_semilla\": filas}\n\
+          \    for clave in claves:\n        valores = np.array([f[clave] for f in\
+          \ filas if f.get(clave) is not None], dtype=float)\n        if len(valores):\n\
+          \            salida[f\"{clave}_media\"] = float(valores.mean())\n      \
+          \      salida[f\"{clave}_std\"] = float(valores.std(ddof=1)) if len(valores)\
+          \ > 1 else 0.0\n            resumen.log_metric(f\"{clave}_media\", salida[f\"\
+          {clave}_media\"])\n            resumen.log_metric(f\"{clave}_std\", salida[f\"\
+          {clave}_std\"])\n    return json.dumps(salida)\n\n"
+        image: python:3.13-slim
+    exec-entrenar-evaluar:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - entrenar_evaluar
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas==3.0.5'\
+          \ 'numpy==2.5.3' 'scikit-learn==1.9.0' 'scipy==1.18.1' 'joblib==1.6.0' 'matplotlib==3.11.1'\
+          \ 'google-cloud-bigquery==3.46.2' 'pyarrow==26.0.0' 'db-dtypes==1.8.0' \
+          \ &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef entrenar_evaluar(\n    repo_zip: str,\n    semilla_split: int,\n\
+          \    metricas: Output[Metrics],\n    clasificacion: Output[ClassificationMetrics],\n\
+          \    modelo: Output[Model],\n) -> str:\n    \"\"\"Entrena y eval\xFAa el\
+          \ modelo del repo con una semilla de partici\xF3n.\"\"\"\n    import io\n\
+          \    import json\n    import os\n    import platform\n    import sys\n \
+          \   import time\n    import urllib.request\n    import zipfile\n\n    import\
+          \ joblib\n    import numpy as np\n    from sklearn.metrics import confusion_matrix,\
+          \ roc_curve\n\n    with urllib.request.urlopen(repo_zip, timeout=120) as\
+          \ resp:  # noqa: S310 - URL fija de GitHub\n        zipfile.ZipFile(io.BytesIO(resp.read())).extractall(\"\
+          /tmp/repo\")\n    raiz = os.path.join(\"/tmp/repo\", os.listdir(\"/tmp/repo\"\
+          )[0])\n    sys.path.insert(0, raiz)\n\n    from mlops_pipeline.src.Cargar_datos\
+          \ import cargar_config, cargar_datos\n    from mlops_pipeline.src.ft_engineering\
+          \ import preparar_datos\n    from mlops_pipeline.src.model_evaluation import\
+          \ evaluar, obtener_score_riesgo\n    from mlops_pipeline.src.model_training\
+          \ import entrenar\n    from scripts.validate_metrics import extraer_metricas\n\
+          \n    config = cargar_config(__import__(\"pathlib\").Path(raiz, \"mlops_pipeline/src/config.json\"\
+          ))\n    t0 = time.perf_counter()\n    df = cargar_datos(config)\n    t_carga\
+          \ = time.perf_counter() - t0\n    datos = preparar_datos(df, random_state=semilla_split)\n\
+          \    t1 = time.perf_counter()\n    entrenamiento = entrenar(datos.X_train,\
+          \ datos.y_train, datos.preprocessor)\n    t_entrenamiento = time.perf_counter()\
+          \ - t1\n    resultado = evaluar(entrenamiento, datos.X_eval, datos.y_eval)\n\
+          \    m = extraer_metricas(resultado)\n    m.update(\n        {\n       \
+          \     \"semilla_split\": semilla_split,\n            \"tiempo_carga_s\"\
+          : round(t_carga, 2),\n            \"tiempo_entrenamiento_s\": round(t_entrenamiento,\
+          \ 2),\n            \"cpu_count\": os.cpu_count(),\n            \"python\"\
+          : platform.python_version(),\n        }\n    )\n\n    for nombre in (\n\
+          \        \"f1_0\",\n        \"recall_0\",\n        \"precision_0\",\n  \
+          \      \"balanced_accuracy\",\n        \"accuracy\",\n        \"roc_auc_risk\"\
+          ,\n        \"average_precision_risk\",\n        \"cv_f1_0_mean\",\n    \
+          \    \"cv_f1_0_std\",\n        \"tiempo_entrenamiento_s\",\n    ):\n   \
+          \     if m.get(nombre) is not None:\n            metricas.log_metric(nombre,\
+          \ float(m[nombre]))\n    metricas.log_metric(\"semilla_split\", semilla_split)\n\
+          \n    modelo_final = entrenamiento.modelo_final_fitted\n    y_riesgo = (np.asarray(datos.y_eval)\
+          \ == 0).astype(int)\n    score = obtener_score_riesgo(modelo_final, datos.X_eval)\n\
+          \    if score is not None:\n        fpr, tpr, umbrales = roc_curve(y_riesgo,\
+          \ score)\n        paso = max(1, len(fpr) // 200)\n        umbrales = np.clip(umbrales[::paso],\
+          \ 0.0, 1.0)\n        clasificacion.log_roc_curve(\n            fpr[::paso].tolist(),\
+          \ tpr[::paso].tolist(), umbrales.tolist()\n        )\n    y_pred = modelo_final.predict(datos.X_eval)\n\
+          \    matriz = confusion_matrix(datos.y_eval, y_pred, labels=[0, 1])\n  \
+          \  clasificacion.log_confusion_matrix([\"riesgo(0)\", \"pago(1)\"], matriz.tolist())\n\
+          \n    os.makedirs(modelo.path, exist_ok=True)\n    joblib.dump(modelo_final,\
+          \ os.path.join(modelo.path, \"model.joblib\"))\n    modelo.metadata.update({\"\
+          framework\": \"scikit-learn\", \"modelo\": m[\"modelo_final\"]})\n    return\
+          \ json.dumps(m)\n\n"
+        image: python:3.13-slim
+        resources:
+          cpuLimit: 4.0
+          memoryLimit: 16.0
+          resourceCpuLimit: '4'
+          resourceMemoryLimit: 16G
+pipelineInfo:
+  description: Modelo de riesgo crediticio del repo CDProd entrenado en Vertex Pipelines.
+  name: cdprod-riesgo-custom
+root:
+  dag:
+    tasks:
+      consolidar:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-consolidar
+        dependentTasks:
+        - for-loop-1
+        inputs:
+          parameters:
+            resultados:
+              taskOutputParameter:
+                outputParameterKey: pipelinechannel--entrenar-evaluar-Output
+                producerTask: for-loop-1
+        taskInfo:
+          name: consolidar-estabilidad
+      for-loop-1:
+        componentRef:
+          name: comp-for-loop-1
+        inputs:
+          parameters:
+            pipelinechannel--repo_zip:
+              componentInputParameter: repo_zip
+            pipelinechannel--semillas:
+              componentInputParameter: semillas
+        iteratorPolicy:
+          parallelismLimit: 5
+        parameterIterator:
+          itemInput: pipelinechannel--semillas-loop-item
+          items:
+            inputParameter: pipelinechannel--semillas
+        taskInfo:
+          name: for-loop-1
+  inputDefinitions:
+    parameters:
+      repo_zip:
+        parameterType: STRING
+      semillas:
+        defaultValue:
+        - 42.0
+        - 7.0
+        - 13.0
+        - 21.0
+        - 99.0
+        isOptional: true
+        parameterType: LIST
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.18.0

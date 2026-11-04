@@ -251,6 +251,32 @@ docker compose up -d --build
 
 UI en `http://localhost:8080` (o `JENKINS_PORT`). El job `CDProd-aprobacion` se crea automáticamente vía JCasC; no hay asistente de instalación ni plugins manuales.
 
+## Entrenamiento en GCP con Vertex AI
+
+`vertex/` compara tres formas de entrenar el modelo sobre el **mismo holdout** (`preparar_datos(random_state=42)`, 2.153 créditos, 102 de riesgo) y con las mismas métricas (`vertex/metricas.py`, clase de riesgo = 0):
+
+| Enfoque | Script | Qué hace |
+|---|---|---|
+| Python local | `vertex/python_local.py` | Flujo del repo en la máquina local (línea base) |
+| Vertex Pipelines | `vertex/pipeline_custom.py` | Pipeline KFP v2: descarga el repo en un commit fijo y ejecuta el mismo flujo con 5 semillas de partición en paralelo (estabilidad) |
+| AutoML Tabular | `vertex/automl_entrenar.py`, `vertex/automl_evaluar.py` | Clasificación AutoML (1 nodo-hora, objetivo ROC-AUC) y batch prediction BigQuery → BigQuery |
+
+`vertex/preparar_tabla_vertex.py` crea `novabank_dev.creditos_vertex` con las 15 variables del modelo y la columna `split` (TRAIN / VALIDATE / TEST). Los resultados quedan en `vertex/resultados/*.json` y el análisis en `vertex/fase2_comparacion.ipynb` (tablas, curvas ROC/PR, consistencia, estabilidad, tiempos y costos).
+
+Entorno aparte (Google Cloud SDK autenticado con `gcloud auth application-default login`):
+
+```powershell
+python -m venv %USERPROFILE%\.venvs\cdprod-vertex
+%USERPROFILE%\.venvs\cdprod-vertex\Scripts\pip install -r vertex\requirements.txt
+# Desde la raíz del repo:
+python -m vertex.preparar_tabla_vertex
+python -m vertex.pipeline_custom            # envía el pipeline custom
+python -m vertex.automl_entrenar            # lanza AutoML (~USD 21)
+python -m vertex.automl_evaluar --evaluar   # batch prediction + métricas
+```
+
+Los `*_scores_test.csv` no se versionan (regla de estructura); se regeneran con `python -m vertex.python_local` y `python -m vertex.automl_evaluar --evaluar --reusar-batch`.
+
 ## Workflow Git
 
 - `main` representa la rama estable.

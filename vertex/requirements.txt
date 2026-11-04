@@ -1,0 +1,11 @@
+# Entorno aparte para los scripts de Vertex AI (Fase 2). No lo usa la API ni Jenkins.
+# Los componentes del pipeline fijan sus propias versiones en vertex/pipeline_custom.py.
+google-cloud-aiplatform==1.165.1
+google-cloud-pipeline-components==2.22.0
+kfp==2.18.0
+google-cloud-bigquery==3.47.0
+db-dtypes==1.9.0
+pyarrow==26.0.1
+numpy==2.5.4
+pandas==3.1.0
+scikit-learn==1.9.1
