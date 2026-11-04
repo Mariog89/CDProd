@@ -16,10 +16,11 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+RAIZ_REPO = Path(__file__).resolve().parents[1]
+
 if __package__ in {None, ""}:
-    _REPO = Path(__file__).resolve().parents[1]
-    if str(_REPO) not in sys.path:
-        sys.path.insert(0, str(_REPO))
+    if str(RAIZ_REPO) not in sys.path:
+        sys.path.insert(0, str(RAIZ_REPO))
 
 # Umbrales mínimos sobre el holdout del modelo final (clase de riesgo 0).
 # Calibrados con margen bajo los resultados BigQuery documentados en readme.md
@@ -120,12 +121,26 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv=None, evaluador=evaluar_modelo) -> int:
+def resolver_salida(ruta: str, raiz: Path) -> Path:
+    """Resuelve una ruta de salida y exige que quede dentro de `raiz`.
+
+    Evita path traversal: `--output ../../x` o rutas absolutas fuera del
+    repositorio se rechazan antes de escribir nada.
+    """
+    base = raiz.resolve()
+    destino = (base / ruta).resolve()
+    if not destino.is_relative_to(base):
+        raise ValueError(f"Ruta de salida fuera del repositorio: {ruta}")
+    return destino
+
+
+def main(argv=None, evaluador=evaluar_modelo, raiz: Path = RAIZ_REPO) -> int:
     args = parse_args(argv)
     umbrales = {nombre: getattr(args, f"min_{nombre}") for nombre in UMBRALES_DEFAULT}
-    resultado = evaluador(Path(args.html) if args.html else None)
+    destino = resolver_salida(args.output, raiz)
+    html = resolver_salida(args.html, raiz) if args.html else None
+    resultado = evaluador(html)
     reporte = construir_reporte(extraer_metricas(resultado), umbrales)
-    destino = Path(args.output)
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text(json.dumps(reporte, indent=2, ensure_ascii=False), encoding="utf-8")
 

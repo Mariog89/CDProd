@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from scripts import validate_metrics as vm
 from scripts import validate_structure as vs
 
@@ -101,10 +103,13 @@ def test_validar_umbrales_aprueba_y_rechaza():
 
 
 def test_validate_metrics_main_escribe_reporte(tmp_path, capsys):
-    salida = tmp_path / "reports" / "metrics.json"
-    codigo = vm.main(["--output", str(salida)], evaluador=lambda html: _resultado_falso())
+    codigo = vm.main(
+        ["--output", "reports/metrics.json"],
+        evaluador=lambda html: _resultado_falso(),
+        raiz=tmp_path,
+    )
     assert codigo == 0
-    reporte = json.loads(salida.read_text(encoding="utf-8"))
+    reporte = json.loads((tmp_path / "reports" / "metrics.json").read_text(encoding="utf-8"))
     assert reporte["aprobado"] is True and reporte["violaciones"] == []
     assert "QUALITY GATE: APROBADO" in capsys.readouterr().out
 
@@ -112,11 +117,32 @@ def test_validate_metrics_main_escribe_reporte(tmp_path, capsys):
 def test_validate_metrics_main_rechaza_con_umbral_personalizado(tmp_path, capsys):
     salida = tmp_path / "metrics.json"
     codigo = vm.main(
-        ["--output", str(salida), "--min-f1-0", "0.5"],
+        ["--output", "metrics.json", "--min-f1-0", "0.5"],
         evaluador=lambda html: _resultado_falso(),
+        raiz=tmp_path,
     )
     assert codigo == 1
     reporte = json.loads(salida.read_text(encoding="utf-8"))
     assert reporte["aprobado"] is False
     assert reporte["umbrales"]["f1_0"] == 0.5
     assert "QUALITY GATE: RECHAZADO" in capsys.readouterr().out
+
+
+def test_resolver_salida_rechaza_rutas_fuera_del_repositorio(tmp_path):
+    raiz = tmp_path / "repo"
+    raiz.mkdir()
+    assert vm.resolver_salida("reports/m.json", raiz) == (raiz / "reports" / "m.json").resolve()
+    for ruta in ("../fuera.json", str(tmp_path / "fuera.json"), "reports/../../x.json"):
+        with pytest.raises(ValueError, match="fuera del repositorio"):
+            vm.resolver_salida(ruta, raiz)
+
+
+def test_validate_metrics_main_no_evalua_si_la_salida_es_invalida(tmp_path):
+    llamado = []
+    with pytest.raises(ValueError):
+        vm.main(
+            ["--output", "../escape.json"],
+            evaluador=lambda html: llamado.append(html),
+            raiz=tmp_path,
+        )
+    assert llamado == []
