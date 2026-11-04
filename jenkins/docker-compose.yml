@@ -1,0 +1,27 @@
+# Jenkins local para CDProd. Uso (desde la carpeta jenkins/):
+#   copy .env.example .env   (y completar valores)
+#   docker compose up -d --build
+# UI: http://localhost:8080 (o el puerto definido en JENKINS_PORT)
+services:
+  jenkins:
+    build: .
+    image: cdprod-jenkins:lts
+    container_name: jenkins
+    user: root
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcloud-adc.json
+      - GOOGLE_CLOUD_PROJECT=cdprod-upb-mg
+    ports:
+      # Puerto del host configurable (JENKINS_PORT en .env) por si 8080 ya está ocupado.
+      - "127.0.0.1:${JENKINS_PORT:-8080}:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Credenciales ADC de gcloud (solo lectura) para leer BigQuery en el pipeline.
+      - ${GCLOUD_ADC_FILE}:/run/secrets/gcloud-adc.json:ro
+
+volumes:
+  jenkins_home: {}

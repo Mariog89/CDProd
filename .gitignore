@@ -32,3 +32,8 @@ artifacts/
 
 # Salidas operativas locales (no versionar)
 runtime/
+
+# Jenkins: entorno y reportes del pipeline, secretos locales
+.venv-ci/
+reports/
+jenkins/.env
